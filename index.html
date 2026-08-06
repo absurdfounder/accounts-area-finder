@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Accounts Area Finder</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div class="brand-row">
+          <div>
+            <p class="eyebrow">Super Sales Agro</p>
+            <h1>Accounts</h1>
+          </div>
+          <div class="header-actions">
+            <button class="text-button" id="connectGoogleBtn" type="button">Connect Google</button>
+            <button class="text-button" id="importContactsBtn" type="button">Import</button>
+            <button class="text-button" id="openMatchBtn" type="button">Match</button>
+            <button class="icon-button" id="resetBtn" type="button" title="Reset filters" aria-label="Reset filters">
+              <span aria-hidden="true">↺</span>
+            </button>
+          </div>
+        </div>
+
+        <p class="session-line" id="sessionLine" hidden></p>
+
+        <label class="searchbar">
+          <span class="sr-only">Search accounts</span>
+          <input
+            id="searchInput"
+            type="search"
+            autocomplete="off"
+            placeholder="Search party, code, area, or phone"
+          />
+        </label>
+
+        <div class="quick-actions">
+          <div class="year-pills" id="yearPills" role="group" aria-label="Year filter"></div>
+          <button class="filter-button" id="openFiltersBtn" type="button">
+            Filters <span id="filterCount" hidden>0</span>
+          </button>
+        </div>
+
+        <div class="active-chips" id="activeChips" aria-label="Active filters"></div>
+      </header>
+
+      <section class="summary-strip" aria-label="Summary">
+        <div>
+          <span id="partyCount">0</span>
+          <small>Parties</small>
+        </div>
+        <div>
+          <span id="netTotal">0</span>
+          <small>Net amount</small>
+        </div>
+        <div>
+          <span id="caseTotal">0</span>
+          <small>Cases</small>
+        </div>
+      </section>
+
+      <section class="results" aria-live="polite">
+        <div id="cardsView" class="cards-view"></div>
+        <div id="tableView" class="table-wrap" hidden>
+          <table>
+            <thead>
+              <tr>
+                <th>Party</th>
+                <th>Area</th>
+                <th>2023-24</th>
+                <th>2024-25</th>
+                <th>2025-26</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+        <p id="emptyState" class="empty-state" hidden>No accounts match these filters.</p>
+      </section>
+    </main>
+
+    <input id="importFileInput" type="file" accept=".csv,.vcf,text/csv,text/vcard,text/x-vcard" hidden />
+
+    <div class="sheet-backdrop" id="filterBackdrop" hidden></div>
+    <aside class="filter-sheet" id="filterSheet" aria-label="Filters" aria-modal="true" role="dialog" hidden>
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <div class="sheet-head">
+        <h2>Filters</h2>
+        <button class="icon-button flat" id="closeFiltersBtn" type="button" aria-label="Close filters">×</button>
+      </div>
+
+      <div class="sheet-controls">
+        <label>
+          <span>Year</span>
+          <select id="yearFilter">
+            <option value="all">All years</option>
+          </select>
+        </label>
+        <label>
+          <span>State</span>
+          <select id="stateFilter"></select>
+        </label>
+        <label>
+          <span>Region</span>
+          <select id="regionFilter"></select>
+        </label>
+        <label>
+          <span>Area group</span>
+          <select id="areaFilter"></select>
+        </label>
+      </div>
+
+      <div class="sheet-options">
+        <label class="toggle">
+          <input id="hideEmptyToggle" type="checkbox" />
+          <span>Hide parties without selected-year amount</span>
+        </label>
+        <div class="segmented" role="group" aria-label="Display mode">
+          <button type="button" class="active" data-view="cards">Cards</button>
+          <button type="button" data-view="table">Table</button>
+        </div>
+      </div>
+
+      <div class="sheet-actions">
+        <button class="ghost-button" id="clearFiltersBtn" type="button">Clear</button>
+        <button class="primary-button" id="applyFiltersBtn" type="button">Apply</button>
+      </div>
+    </aside>
+
+    <div class="sheet-backdrop" id="matchBackdrop" hidden></div>
+    <aside class="filter-sheet match-sheet" id="matchSheet" aria-label="Match contacts" aria-modal="true" role="dialog" hidden>
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <div class="sheet-head">
+        <h2>Match contacts</h2>
+        <button class="icon-button flat" id="closeMatchBtn" type="button" aria-label="Close match sheet">×</button>
+      </div>
+
+      <div class="match-summary" id="matchSummary"></div>
+      <div class="match-toolbar">
+        <button class="ghost-button compact" id="refreshContactsBtn" type="button">Refresh contacts</button>
+        <button class="ghost-button compact" id="signOutBtn" type="button">Sign out</button>
+      </div>
+      <div class="match-list" id="matchList"></div>
+      <p class="match-empty" id="matchEmpty" hidden>No suggestions right now. Connect Google or import contacts first.</p>
+    </aside>
+
+    <div class="toast" id="toast" hidden></div>
+
+    <script src="./config.js"></script>
+    <script src="./data.js"></script>
+    <script src="./contacts.js"></script>
+    <script src="./matcher.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
