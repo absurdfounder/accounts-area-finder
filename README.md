@@ -6,6 +6,7 @@ Live site: https://vocal-tulumba-d77c15.netlify.app
 
 ## Features
 
+- **Timeline view** — year-agnostic month/week produce arrivals (who to call this week + upcoming)
 - Filter parties by year, state, region, area
 - Connect Google Contacts (People API) or import CSV/vCard
 - Suggested contact ↔ party matches; confirm links locally
@@ -19,6 +20,33 @@ npx --yes serve .
 ```
 
 Open the printed URL (use an origin you register in Google Cloud).
+
+## Regenerate lot / timeline data
+
+Timeline arrivals are built from party statement RTFs (not yearly totals).
+
+Default inputs (in `~/Downloads`):
+
+- `2023-2024 report.rtf`
+- `2024-2025 report.rtf`
+- `2025-2026 report.rtf`
+- optional fallback: `Combined_Party_Lot_Report_No_Gujarat.xlsx` (single-day lots only)
+
+```bash
+python3 scripts/build-lots.py
+# writes lots.js
+```
+
+Custom paths:
+
+```bash
+python3 scripts/build-lots.py \
+  --rtf ~/Downloads/2023-2024\ report.rtf ~/Downloads/2024-2025\ report.rtf ~/Downloads/2025-2026\ report.rtf \
+  --xlsx ~/Downloads/Combined_Party_Lot_Report_No_Gujarat.xlsx \
+  --out lots.js
+```
+
+Week buckets: days 1–7 / 8–14 / 15–21 / 22–31. Placement ignores year; years are shown as recurrence evidence.
 
 ## Google Cloud setup (Connect with Google)
 
@@ -67,6 +95,8 @@ Ensure `config.js` on the machine you deploy from contains the real client ID (o
 |------|------|
 | `config.js` | Google client ID |
 | `data.js` | Party accounts payload |
+| `lots.js` | Arrival dates + seasonal buckets (generated) |
+| `scripts/build-lots.py` | Rebuild `lots.js` from RTFs |
 | `contacts.js` | Auth, sync, CSV/vCard, storage |
 | `matcher.js` | Contact ↔ party scoring |
-| `app.js` | UI |
+| `app.js` | UI (Timeline / Cards / Table) |

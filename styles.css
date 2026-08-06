@@ -842,6 +842,10 @@ td.money {
   background: #f4f7fb;
 }
 
+.segmented.three {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
 .segmented button {
   min-height: 44px;
   border: 0;
@@ -1010,5 +1014,249 @@ body.sheet-open {
 
   .match-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Timeline + call strip */
+.call-strip {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 14px;
+}
+
+.call-block {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  padding: 12px;
+  box-shadow: 0 8px 22px rgba(23, 32, 51, 0.06);
+}
+
+.call-block-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.call-block-head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.call-block-head span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.call-chip-row,
+.timeline-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.call-empty,
+.timeline-empty {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.party-chip {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #f7fafc;
+  color: var(--ink);
+  padding: 8px 10px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.party-chip:hover {
+  border-color: var(--blue);
+  background: #eef5fa;
+}
+
+.chip-code {
+  border-radius: 7px;
+  background: var(--chip);
+  color: var(--blue-dark);
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.chip-name {
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.chip-meta {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.chip-call {
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.timeline-view {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.timeline-month {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  overflow: hidden;
+  box-shadow: 0 10px 26px rgba(23, 32, 51, 0.06);
+}
+
+.timeline-month-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  background: #f7fafc;
+}
+
+.timeline-month-head h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.timeline-month-head span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.timeline-week {
+  position: relative;
+  padding: 12px 14px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.timeline-week:last-child {
+  border-bottom: 0;
+}
+
+.timeline-week.is-today {
+  background: linear-gradient(180deg, rgba(31, 95, 139, 0.08), rgba(31, 95, 139, 0.02));
+  box-shadow: inset 3px 0 0 var(--blue);
+}
+
+.today-marker {
+  margin-bottom: 8px;
+}
+
+.today-marker span {
+  display: inline-flex;
+  border-radius: 999px;
+  background: var(--blue);
+  color: #fff;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.timeline-week-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.timeline-week-head strong {
+  font-size: 14px;
+}
+
+.timeline-week-head span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.party-sheet-body {
+  display: grid;
+  gap: 12px;
+  padding-bottom: 8px;
+}
+
+.party-sheet-meta,
+.party-sheet-focus {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.party-date-list h3,
+.party-season-summary h3 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.party-date-list ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.party-date-list li {
+  margin: 4px 0;
+  font-size: 13px;
+}
+
+.party-season-summary p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .call-block-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .timeline-month-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .timeline-week-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .party-chip {
+    width: 100%;
   }
 }

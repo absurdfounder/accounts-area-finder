@@ -1,9 +1,32 @@
 (function () {
   const data = window.ACCOUNTS_DATA || { years: [], accounts: [] };
+  const lotsData = window.LOTS_DATA || { lots: [], seasonal: {} };
   const years = data.years;
   const accounts = data.accounts;
+  const accountByCode = Object.fromEntries(accounts.map((account) => [account.partyCode, account]));
   const store = window.ContactsStore;
   const matcher = window.ContactMatcher;
+
+  const MONTH_NAMES = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+  const WEEK_LABELS = {
+    1: "Days 1–7",
+    2: "Days 8–14",
+    3: "Days 15–21",
+    4: "Days 22–31",
+  };
 
   const els = {
     search: document.getElementById("searchInput"),
@@ -28,6 +51,11 @@
     cards: document.getElementById("cardsView"),
     table: document.getElementById("tableView"),
     tableBody: document.getElementById("tableBody"),
+    timeline: document.getElementById("timelineView"),
+    callStrip: document.getElementById("callStrip"),
+    callNowList: document.getElementById("callNowList"),
+    upcomingList: document.getElementById("upcomingList"),
+    callNowLabel: document.getElementById("callNowLabel"),
     empty: document.getElementById("emptyState"),
     viewButtons: Array.from(document.querySelectorAll("[data-view]")),
     connectGoogle: document.getElementById("connectGoogleBtn"),
@@ -44,6 +72,11 @@
     refreshContacts: document.getElementById("refreshContactsBtn"),
     signOut: document.getElementById("signOutBtn"),
     toast: document.getElementById("toast"),
+    partyBackdrop: document.getElementById("partyBackdrop"),
+    partySheet: document.getElementById("partySheet"),
+    closeParty: document.getElementById("closePartyBtn"),
+    partySheetTitle: document.getElementById("partySheetTitle"),
+    partySheetBody: document.getElementById("partySheetBody"),
   };
 
   const nf = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
@@ -52,9 +85,32 @@
     minimumFractionDigits: 0,
   });
 
-  let currentView = "cards";
+  let currentView = "timeline";
   let toastTimer = null;
   let pickModeContactId = null;
+  let didScrollToToday = false;
+
+  function todayParts(date = new Date()) {
+    const day = date.getDate();
+    const week = day <= 7 ? 1 : day <= 14 ? 2 : day <= 21 ? 3 : 4;
+    return { month: date.getMonth() + 1, week, day, year: date.getFullYear() };
+  }
+
+  function nextBuckets(month, week, count) {
+    const out = [];
+    let m = month;
+    let w = week;
+    for (let i = 0; i < count; i += 1) {
+      w += 1;
+      if (w > 4) {
+        w = 1;
+        m += 1;
+        if (m > 12) m = 1;
+      }
+      out.push({ month: m, week: w });
+    }
+    return out;
+  }
 
   function valueFor(account, year, key) {
     if (year === "all") {
@@ -221,6 +277,59 @@
     ));
   }
 
+  function lotMatchesYearFilter(lot) {
+    const selected = els.year.value;
+    if (selected === "all") return true;
+    const source = String(lot.source || "");
+    if (source.includes(selected)) return true;
+    // Fiscal-year style evidence: Jul–Dec of start year, Jan–Mar of end year
+    const [startYear, endYear] = selected.split("-").map((part) => Number(part));
+    if (!startYear || !endYear) return true;
+    if (lot.year === startYear && lot.month >= 4) return true;
+    if (lot.year === endYear && lot.month <= 3) return true;
+    return false;
+  }
+
+  function filteredLots() {
+    const allowed = new Set(filteredAccounts().map((account) => account.partyCode));
+    return (lotsData.lots || []).filter((lot) => allowed.has(lot.partyCode) && lotMatchesYearFilter(lot));
+  }
+
+  function buildSeasonalFromLots(lots) {
+    const buckets = {};
+    lots.forEach((lot) => {
+      const key = `${lot.month}-${lot.week}`;
+      const bucket = buckets[key] || (buckets[key] = {});
+      const entry =
+        bucket[lot.partyCode] ||
+        (bucket[lot.partyCode] = {
+          partyCode: lot.partyCode,
+          years: new Set(),
+          lotCount: 0,
+          totalCases: 0,
+          dates: [],
+        });
+      entry.years.add(lot.year);
+      entry.lotCount += 1;
+      entry.totalCases += Number(lot.cases || 0);
+      entry.dates.push(lot.date);
+    });
+
+    const out = {};
+    Object.entries(buckets).forEach(([key, parties]) => {
+      out[key] = Object.values(parties)
+        .map((entry) => ({
+          partyCode: entry.partyCode,
+          years: Array.from(entry.years).sort((a, b) => a - b),
+          lotCount: entry.lotCount,
+          totalCases: entry.totalCases,
+          dates: Array.from(new Set(entry.dates)).sort(),
+        }))
+        .sort((a, b) => b.lotCount - a.lotCount || b.totalCases - a.totalCases || a.partyCode.localeCompare(b.partyCode));
+    });
+    return out;
+  }
+
   function activeFilterItems() {
     const items = [];
     if (els.year.value !== "all") items.push(els.year.value);
@@ -295,6 +404,174 @@
         ${tel}
       </div>
     `;
+  }
+
+  function shortYears(yearsList) {
+    return (yearsList || []).map((year) => String(year).slice(2)).join(",");
+  }
+
+  function partyChip(entry, opts = {}) {
+    const account = accountByCode[entry.partyCode];
+    const name = account?.partyName || entry.partyCode;
+    const contact = store.contactForParty(entry.partyCode);
+    const phone = contact?.phones?.[0];
+    const call = phone
+      ? `<a class="chip-call" href="tel:+91${escapeHtml(phone)}" onclick="event.stopPropagation()">Call</a>`
+      : "";
+    const meta = opts.hideMeta
+      ? ""
+      : `<span class="chip-meta">×${entry.lotCount}${entry.years?.length ? ` · ${escapeHtml(shortYears(entry.years))}` : ""}</span>`;
+    return `
+      <button type="button" class="party-chip" data-party-code="${escapeHtml(entry.partyCode)}" data-month="${opts.month || ""}" data-week="${opts.week || ""}">
+        <span class="chip-code">${escapeHtml(entry.partyCode)}</span>
+        <span class="chip-name">${escapeHtml(name)}</span>
+        ${meta}
+        ${call}
+      </button>
+    `;
+  }
+
+  function bindPartyChips(root) {
+    root.querySelectorAll(".party-chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        openPartySheet(chip.dataset.partyCode, Number(chip.dataset.month) || null, Number(chip.dataset.week) || null);
+      });
+    });
+  }
+
+  function openPartySheet(partyCode, month, week) {
+    const account = accountByCode[partyCode];
+    const lots = filteredLots().filter((lot) => lot.partyCode === partyCode);
+    const scoped = month && week ? lots.filter((lot) => lot.month === month && lot.week === week) : lots;
+    const contact = store.contactForParty(partyCode);
+    els.partySheetTitle.textContent = account?.partyName || partyCode;
+
+    const byMonth = {};
+    lots.forEach((lot) => {
+      const key = `${MONTH_NAMES[lot.month - 1]} W${lot.week}`;
+      byMonth[key] = (byMonth[key] || 0) + 1;
+    });
+
+    els.partySheetBody.innerHTML = `
+      <p class="party-sheet-meta">
+        <strong>${escapeHtml(partyCode)}</strong>
+        ${account ? `· ${escapeHtml(account.areaGroup)} · ${escapeHtml(account.region)}` : ""}
+      </p>
+      ${contactBlock(account || { partyCode })}
+      ${
+        month && week
+          ? `<p class="party-sheet-focus">In ${escapeHtml(MONTH_NAMES[month - 1])} week ${week}: <strong>${scoped.length}</strong> historical arrival${scoped.length === 1 ? "" : "s"}</p>`
+          : ""
+      }
+      <div class="party-date-list">
+        <h3>Arrival dates</h3>
+        <ul>
+          ${(scoped.length ? scoped : lots)
+            .slice()
+            .sort((a, b) => a.date.localeCompare(b.date))
+            .map((lot) => `<li><strong>${escapeHtml(lot.date)}</strong> · W${lot.week} · ${formatCases(lot.cases)} cases</li>`)
+            .join("") || "<li>No lot dates in current filters.</li>"}
+        </ul>
+      </div>
+      <div class="party-season-summary">
+        <h3>Season pattern</h3>
+        <p>${Object.entries(byMonth)
+          .map(([label, count]) => `${escapeHtml(label)} ×${count}`)
+          .join(" · ") || "No pattern yet."}</p>
+      </div>
+    `;
+    openSheet(els.partyBackdrop, els.partySheet);
+  }
+
+  function closePartySheet() {
+    closeSheetPair(els.partyBackdrop, els.partySheet);
+  }
+
+  function renderCallStrip(seasonal) {
+    const today = todayParts();
+    const nowKey = `${today.month}-${today.week}`;
+    const nowEntries = seasonal[nowKey] || [];
+    const upcoming = nextBuckets(today.month, today.week, 2).flatMap(({ month, week }) =>
+      (seasonal[`${month}-${week}`] || []).map((entry) => ({ ...entry, month, week }))
+    );
+
+    // Dedupe upcoming against call-now
+    const nowCodes = new Set(nowEntries.map((entry) => entry.partyCode));
+    const upcomingUnique = [];
+    const seen = new Set();
+    upcoming.forEach((entry) => {
+      if (nowCodes.has(entry.partyCode) || seen.has(entry.partyCode)) return;
+      seen.add(entry.partyCode);
+      upcomingUnique.push(entry);
+    });
+
+    els.callNowLabel.textContent = `${MONTH_NAMES[today.month - 1]} · Week ${today.week}`;
+    els.callNowList.innerHTML = nowEntries.length
+      ? nowEntries.slice(0, 24).map((entry) => partyChip(entry, { month: today.month, week: today.week })).join("")
+      : `<p class="call-empty">No recurring farmers for this week in the current filters.</p>`;
+    els.upcomingList.innerHTML = upcomingUnique.length
+      ? upcomingUnique
+          .slice(0, 24)
+          .map((entry) => partyChip(entry, { month: entry.month, week: entry.week }))
+          .join("")
+      : `<p class="call-empty">No upcoming farmers in the next two weeks.</p>`;
+
+    bindPartyChips(els.callNowList);
+    bindPartyChips(els.upcomingList);
+  }
+
+  function renderTimeline() {
+    const lots = filteredLots();
+    const seasonal = buildSeasonalFromLots(lots);
+    const today = todayParts();
+    renderCallStrip(seasonal);
+
+    const monthsHtml = MONTH_NAMES.map((name, index) => {
+      const month = index + 1;
+      const weeks = [1, 2, 3, 4]
+        .map((week) => {
+          const entries = seasonal[`${month}-${week}`] || [];
+          const isToday = month === today.month && week === today.week;
+          return `
+            <div class="timeline-week${isToday ? " is-today" : ""}" id="${isToday ? "timelineToday" : ""}" data-month="${month}" data-week="${week}">
+              ${isToday ? `<div class="today-marker"><span>Today · ${today.day} ${name}</span></div>` : ""}
+              <div class="timeline-week-head">
+                <strong>Week ${week}</strong>
+                <span>${WEEK_LABELS[week]} · ${entries.length} farmers</span>
+              </div>
+              <div class="timeline-chip-row">
+                ${
+                  entries.length
+                    ? entries.map((entry) => partyChip(entry, { month, week })).join("")
+                    : `<span class="timeline-empty">No arrivals historically</span>`
+                }
+              </div>
+            </div>
+          `;
+        })
+        .join("");
+
+      return `
+        <section class="timeline-month" data-month="${month}">
+          <header class="timeline-month-head">
+            <h2>${name}</h2>
+            <span>Seasonal pattern across years</span>
+          </header>
+          ${weeks}
+        </section>
+      `;
+    }).join("");
+
+    els.timeline.innerHTML = monthsHtml;
+    bindPartyChips(els.timeline);
+
+    if (!didScrollToToday) {
+      requestAnimationFrame(() => {
+        const marker = document.getElementById("timelineToday");
+        if (marker) marker.scrollIntoView({ block: "center", behavior: "smooth" });
+        didScrollToToday = true;
+      });
+    }
   }
 
   function renderCards(rows) {
@@ -460,6 +737,8 @@
         pickModeContactId = button.dataset.contactId;
         document.body.classList.add("pick-mode");
         closeMatchSheet();
+        currentView = "cards";
+        els.viewButtons.forEach((item) => item.classList.toggle("active", item.dataset.view === "cards"));
         showToast("Tap a party card to link this contact");
         render();
       });
@@ -479,11 +758,32 @@
     renderControls();
     const rows = filteredAccounts();
     renderSummary(rows);
-    renderCards(rows);
-    renderTable(rows);
-    els.empty.hidden = rows.length !== 0;
-    els.cards.hidden = currentView !== "cards" || rows.length === 0;
-    els.table.hidden = currentView !== "table" || rows.length === 0;
+
+    const showTimeline = currentView === "timeline";
+    const showCards = currentView === "cards";
+    const showTable = currentView === "table";
+
+    els.callStrip.hidden = !showTimeline;
+    els.timeline.hidden = !showTimeline;
+    els.cards.hidden = !showCards || rows.length === 0;
+    els.table.hidden = !showTable || rows.length === 0;
+
+    if (showTimeline) {
+      renderTimeline();
+      const hasLots = filteredLots().length > 0;
+      els.empty.hidden = hasLots;
+      if (!hasLots) {
+        els.empty.textContent = "No lot arrivals match these filters.";
+        els.timeline.hidden = true;
+      } else {
+        els.empty.textContent = "No accounts match these filters.";
+      }
+    } else {
+      renderCards(rows);
+      renderTable(rows);
+      els.empty.hidden = rows.length !== 0;
+      els.empty.textContent = "No accounts match these filters.";
+    }
   }
 
   function resetFilters() {
@@ -610,10 +910,13 @@
   els.matchBackdrop.addEventListener("click", closeMatchSheet);
   els.refreshContacts.addEventListener("click", handleRefreshContacts);
   els.signOut.addEventListener("click", handleSignOut);
+  els.closeParty.addEventListener("click", closePartySheet);
+  els.partyBackdrop.addEventListener("click", closePartySheet);
 
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
-    if (!els.matchSheet.hidden) closeMatchSheet();
+    if (!els.partySheet.hidden) closePartySheet();
+    else if (!els.matchSheet.hidden) closeMatchSheet();
     else if (!els.filterSheet.hidden) closeFilterSheet();
     else if (pickModeContactId) {
       pickModeContactId = null;
@@ -627,6 +930,7 @@
     button.addEventListener("click", () => {
       currentView = button.dataset.view;
       els.viewButtons.forEach((item) => item.classList.toggle("active", item === button));
+      if (currentView === "timeline") didScrollToToday = false;
       render();
     });
   });
