@@ -53,9 +53,8 @@
     tableBody: document.getElementById("tableBody"),
     timeline: document.getElementById("timelineView"),
     empty: document.getElementById("emptyState"),
-    mainTabs: Array.from(document.querySelectorAll("[data-main-view]")),
-    gridToolbar: document.getElementById("gridToolbar"),
-    gridLayoutButtons: Array.from(document.querySelectorAll("[data-grid-layout]")),
+    viewTabs: Array.from(document.querySelectorAll("[data-view]")),
+    viewPanels: document.getElementById("viewPanels"),
     timelineNav: document.getElementById("timelineNav"),
     monthRail: document.getElementById("monthRail"),
     jumpToday: document.getElementById("jumpTodayBtn"),
@@ -92,8 +91,7 @@
   });
 
   const PHONES_KEY = "ssa_party_phones_v1";
-  let mainView = "timeline";
-  let gridLayout = "cards";
+  let activeView = "timeline";
   let toastTimer = null;
   let pickModeContactId = null;
   let shouldFixtureToToday = true;
@@ -471,20 +469,30 @@
     `;
   }
 
-  function contactBlock(account) {
+  function contactBlock(account, { showCall = false } = {}) {
     if (!account) return "";
     const contact = store.contactForParty(account.partyCode);
     const phone = getPartyPhone(account.partyCode);
     const contactName = contact?.name ? `<strong>${escapeHtml(contact.name)}</strong>` : "";
     const phoneLabel = phone ? `<span class="tel-link">+91 ${escapeHtml(phone)}</span>` : `<span class="muted-note">No number yet</span>`;
+    const callBtn = showCall ? callButtonHtml(account.partyCode) : "";
     return `
       <div class="contact-link-row">
         <span class="contact-badge">${contact ? "Contact" : "Phone"}</span>
         ${contactName}
         ${phoneLabel}
-        ${callButtonHtml(account.partyCode)}
+        ${callBtn}
       </div>
     `;
+  }
+
+  function contactHint(account) {
+    if (!account) return "";
+    const phone = getPartyPhone(account.partyCode);
+    if (phone) return `<span class="row-phone">+91 ${escapeHtml(phone)}</span>`;
+    const contact = store.contactForParty(account.partyCode);
+    if (contact?.name) return `<span class="row-contact">${escapeHtml(contact.name)}</span>`;
+    return `<span class="row-muted">Tap for details</span>`;
   }
 
   function shortYears(yearsList) {
@@ -498,14 +506,13 @@
       ? ""
       : `<span class="chip-meta">×${entry.lotCount}${entry.years?.length ? ` · ${escapeHtml(shortYears(entry.years))}` : ""}</span>`;
     return `
-      <div class="party-chip" data-party-code="${escapeHtml(entry.partyCode)}" data-month="${opts.month || ""}" data-week="${opts.week || ""}">
-        <button type="button" class="chip-main" data-open-party="${escapeHtml(entry.partyCode)}">
+      <button type="button" class="party-row" data-open-party="${escapeHtml(entry.partyCode)}" data-party-code="${escapeHtml(entry.partyCode)}" data-month="${opts.month || ""}" data-week="${opts.week || ""}">
+        <span class="row-left">
           <span class="chip-code">${escapeHtml(entry.partyCode)}</span>
           <span class="chip-name">${escapeHtml(name)}</span>
-          ${meta}
-        </button>
-        ${callButtonHtml(entry.partyCode)}
-      </div>
+        </span>
+        <span class="row-right">${meta}</span>
+      </button>
     `;
   }
 
@@ -518,15 +525,13 @@
   function bindPartyChips(root) {
     root.querySelectorAll("[data-open-party]").forEach((button) => {
       button.addEventListener("click", () => {
-        const chip = button.closest(".party-chip");
         openPartySheet(
           button.dataset.openParty,
-          Number(chip?.dataset.month) || null,
-          Number(chip?.dataset.week) || null
+          Number(button.dataset.month) || null,
+          Number(button.dataset.week) || null
         );
       });
     });
-    bindCallActions(root);
   }
 
   function openPartySheet(partyCode, month, week) {
@@ -547,7 +552,7 @@
         <strong>${escapeHtml(partyCode)}</strong>
         ${account ? `· ${escapeHtml(account.areaGroup)} · ${escapeHtml(account.region)}` : ""}
       </p>
-      ${contactBlock(account || { partyCode })}
+      ${contactBlock(account || { partyCode }, { showCall: true })}
       <div class="party-phone-edit">
         <label>
           <span>Mobile number</span>
@@ -717,33 +722,36 @@
         const focusCases = valueFor(account, selectedYear, "cases");
         const negative = Number(focusAmount) < 0 ? "negative" : "";
         const pickAttr = pickModeContactId ? ` data-pick-party="${escapeHtml(account.partyCode)}"` : "";
+        const yearSummary = years
+          .map((year) => {
+            const amt = account.years[year]?.netAmount;
+            if (amt === null || amt === undefined) return "";
+            return `<span class="metric-pill${Number(amt) < 0 ? " negative" : ""}">${year.slice(2)} ${formatAmount(amt)}</span>`;
+          })
+          .filter(Boolean)
+          .join("");
         return `
-          <article class="account-card"${pickAttr}>
-            <div class="card-main">
-              <div class="card-topline">
-                <span class="party-code">${escapeHtml(account.partyCode)}</span>
-                <div class="amount-focus">
-                  <strong class="${negative}">${formatAmount(focusAmount)}</strong>
-                  <small>${formatCases(focusCases)} cases</small>
-                </div>
-              </div>
-              <h2 class="party-name">${escapeHtml(account.partyName)}</h2>
-              ${contactBlock(account)}
-              <p class="area-stack">
-                <strong>${escapeHtml(account.areaGroup)}</strong>
-                <span>${escapeHtml(account.region)} · ${escapeHtml(account.state)}</span>
-                <span>${escapeHtml(account.rawArea)}</span>
-              </p>
-            </div>
-            <div class="year-grid">
-              ${years.map((year) => yearCell(account, year)).join("")}
-            </div>
-          </article>
+          <button type="button" class="account-row${pickAttr ? " pickable" : ""}" data-open-party="${escapeHtml(account.partyCode)}"${pickAttr}>
+            <span class="row-left">
+              <span class="party-code">${escapeHtml(account.partyCode)}</span>
+              <span class="party-name">${escapeHtml(account.partyName)}</span>
+              <span class="row-sub">${escapeHtml(account.areaGroup)} · ${escapeHtml(account.region)}</span>
+            </span>
+            <span class="row-right">
+              <strong class="amount-focus ${negative}">${formatAmount(focusAmount)}</strong>
+              <span class="row-metrics">${formatCases(focusCases)} cases</span>
+              ${contactHint(account)}
+            </span>
+            ${yearSummary ? `<span class="row-years">${yearSummary}</span>` : ""}
+          </button>
         `;
       })
       .join("");
 
-    bindCallActions(els.cards);
+    els.cards.querySelectorAll("[data-open-party]").forEach((row) => {
+      if (pickModeContactId) return;
+      row.addEventListener("click", () => openPartySheet(row.dataset.openParty));
+    });
 
     if (pickModeContactId) {
       els.cards.querySelectorAll("[data-pick-party]").forEach((card) => {
@@ -772,12 +780,13 @@
           .join("");
         const contact = store.contactForParty(account.partyCode);
         const phone = getPartyPhone(account.partyCode);
-        const contactHtml = `
-          <br /><small class="contact-inline">${contact ? escapeHtml(contact.name) : "Party"}${phone ? ` · ${escapeHtml(phone)}` : " · no number"}</small>
-          <br />${callButtonHtml(account.partyCode)}
-        `;
+        const contactHtml = phone
+          ? `<br /><small class="contact-inline">+91 ${escapeHtml(phone)}</small>`
+          : contact
+            ? `<br /><small class="contact-inline">${escapeHtml(contact.name)}</small>`
+            : "";
         return `
-          <tr>
+          <tr class="table-row-clickable" data-open-party="${escapeHtml(account.partyCode)}">
             <td><strong>${escapeHtml(account.partyCode)}</strong><br />${escapeHtml(account.partyName)}${contactHtml}</td>
             <td>${escapeHtml(account.state)}<br />${escapeHtml(account.region)}<br /><strong>${escapeHtml(account.areaGroup)}</strong><br /><small>${escapeHtml(account.rawArea)}</small></td>
             ${yearColumns}
@@ -785,7 +794,9 @@
         `;
       })
       .join("");
-    bindCallActions(els.tableBody);
+    els.tableBody.querySelectorAll("[data-open-party]").forEach((row) => {
+      row.addEventListener("click", () => openPartySheet(row.dataset.openParty));
+    });
   }
 
   function renderMatchSheet() {
@@ -877,11 +888,8 @@
         pickModeContactId = button.dataset.contactId;
         document.body.classList.add("pick-mode");
         closeMatchSheet();
-        mainView = "grid";
-        gridLayout = "cards";
-        syncViewChrome();
-        showToast("Tap a party card to link this contact");
-        render();
+        switchView("cards");
+        showToast("Tap a party row to link this contact");
       });
     });
     els.matchList.querySelectorAll(".alt-pick").forEach((button) => {
@@ -895,33 +903,34 @@
   }
 
   function syncViewChrome() {
-    els.mainTabs.forEach((tab) => {
-      const active = tab.dataset.mainView === mainView;
+    els.viewTabs.forEach((tab) => {
+      const active = tab.dataset.view === activeView;
       tab.classList.toggle("active", active);
       tab.setAttribute("aria-selected", active ? "true" : "false");
     });
-    els.gridLayoutButtons.forEach((button) => {
-      button.classList.toggle("active", button.dataset.gridLayout === gridLayout);
-    });
-    document.querySelectorAll("[data-filter-view]").forEach((button) => {
-      const mode = button.dataset.filterView;
-      const active =
-        (mode === "timeline" && mainView === "timeline") ||
-        (mode === "cards" && mainView === "grid" && gridLayout === "cards") ||
-        (mode === "table" && mainView === "grid" && gridLayout === "table");
-      button.classList.toggle("active", active);
-    });
-    document.querySelectorAll("[data-nav]").forEach((button) => {
-      const nav = button.dataset.nav;
-      const active =
-        (nav === "timeline" && mainView === "timeline") ||
-        (nav === "grid" && mainView === "grid");
-      button.classList.toggle("active", active);
-      if (nav === "timeline" || nav === "grid") {
-        button.setAttribute("aria-current", active ? "page" : "false");
-      }
-    });
+    els.timelineNav.hidden = activeView !== "timeline";
     requestAnimationFrame(updateStickyOffsets);
+  }
+
+  function switchView(view) {
+    if (view === activeView) return;
+    activeView = view;
+    if (view === "timeline") shouldFixtureToToday = true;
+
+    const panels = {
+      timeline: els.timeline,
+      cards: els.cards,
+      table: els.table,
+    };
+
+    Object.entries(panels).forEach(([key, panel]) => {
+      const isActive = key === view;
+      panel.classList.toggle("active", isActive);
+      panel.setAttribute("aria-hidden", isActive ? "false" : "true");
+    });
+
+    syncViewChrome();
+    render();
   }
 
   function openMoreSheet() {
@@ -934,33 +943,37 @@
 
   function render() {
     renderControls();
-    syncViewChrome();
     const rows = filteredAccounts();
     renderSummary(rows);
 
-    const showTimeline = mainView === "timeline";
-    const showGrid = mainView === "grid";
-    const showCards = showGrid && gridLayout === "cards";
-    const showTable = showGrid && gridLayout === "table";
+    const panels = {
+      timeline: els.timeline,
+      cards: els.cards,
+      table: els.table,
+    };
+    Object.entries(panels).forEach(([key, panel]) => {
+      const isActive = key === activeView;
+      panel.classList.toggle("active", isActive);
+      panel.setAttribute("aria-hidden", isActive ? "false" : "true");
+    });
+    syncViewChrome();
 
-    els.gridToolbar.hidden = !showGrid;
-    els.timelineNav.hidden = !showTimeline;
-    els.timeline.hidden = !showTimeline;
-    els.cards.hidden = !showCards || rows.length === 0;
-    els.table.hidden = !showTable || rows.length === 0;
-
-    if (showTimeline) {
+    if (activeView === "timeline") {
       renderTimeline();
       const hasLots = filteredLots().length > 0;
       els.empty.hidden = hasLots;
       if (!hasLots) {
         els.empty.textContent = "No lot arrivals match these filters.";
-        els.timeline.hidden = true;
+        els.timeline.classList.remove("active");
+        els.timeline.setAttribute("aria-hidden", "true");
       } else {
         els.empty.textContent = "No accounts match these filters.";
       }
-    } else {
+    } else if (activeView === "cards") {
       renderCards(rows);
+      els.empty.hidden = rows.length !== 0;
+      els.empty.textContent = "No accounts match these filters.";
+    } else {
       renderTable(rows);
       els.empty.hidden = rows.length !== 0;
       els.empty.textContent = "No accounts match these filters.";
@@ -1123,48 +1136,14 @@
     }
   });
 
-  els.mainTabs.forEach((tab) => {
-    tab.addEventListener("click", () => {
-      mainView = tab.dataset.mainView;
-      if (mainView === "timeline") shouldFixtureToToday = true;
-      render();
-    });
-  });
-
-  els.gridLayoutButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      gridLayout = button.dataset.gridLayout;
-      mainView = "grid";
-      render();
-    });
-  });
-
-  document.querySelectorAll("[data-filter-view]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const mode = button.dataset.filterView;
-      if (mode === "timeline") {
-        mainView = "timeline";
-        shouldFixtureToToday = true;
-      } else {
-        mainView = "grid";
-        gridLayout = mode;
-      }
-      render();
-      closeFilterSheet();
-    });
+  els.viewTabs.forEach((tab) => {
+    tab.addEventListener("click", () => switchView(tab.dataset.view));
   });
 
   document.querySelectorAll("[data-nav]").forEach((button) => {
     button.addEventListener("click", () => {
       const nav = button.dataset.nav;
-      if (nav === "timeline") {
-        mainView = "timeline";
-        shouldFixtureToToday = true;
-        render();
-      } else if (nav === "grid") {
-        mainView = "grid";
-        render();
-      } else if (nav === "filters") {
+      if (nav === "filters") {
         openFilterSheet();
       } else if (nav === "more") {
         openMoreSheet();
@@ -1198,9 +1177,7 @@
   });
   document.getElementById("jumpTodayBtnMobile")?.addEventListener("click", () => {
     closeMoreSheet();
-    mainView = "timeline";
-    shouldFixtureToToday = true;
-    render();
+    switchView("timeline");
   });
 
   window.addEventListener("resize", () => {

@@ -51,9 +51,19 @@
 
         <div class="active-chips" id="activeChips" aria-label="Active filters"></div>
 
-        <div class="view-tabs desktop-only" role="tablist" aria-label="Main view">
-          <button type="button" class="view-tab" role="tab" data-main-view="grid" id="tabGrid" aria-selected="false">Grid</button>
-          <button type="button" class="view-tab active" role="tab" data-main-view="timeline" id="tabTimeline" aria-selected="true">Timeline</button>
+        <div class="view-tabs" role="tablist" aria-label="Main view">
+          <button type="button" class="view-tab active" role="tab" data-view="timeline" id="tabTimeline" aria-selected="true">
+            <span class="tab-icon" aria-hidden="true">▦</span>
+            <span>Timeline</span>
+          </button>
+          <button type="button" class="view-tab" role="tab" data-view="cards" id="tabCards" aria-selected="false">
+            <span class="tab-icon" aria-hidden="true">▣</span>
+            <span>Cards</span>
+          </button>
+          <button type="button" class="view-tab" role="tab" data-view="table" id="tabTable" aria-selected="false">
+            <span class="tab-icon" aria-hidden="true">☰</span>
+            <span>Table</span>
+          </button>
         </div>
 
         <section class="timeline-nav" id="timelineNav" hidden aria-label="Month navigator">
@@ -79,43 +89,30 @@
         </div>
       </section>
 
-      <section class="grid-toolbar" id="gridToolbar" hidden>
-        <div class="segmented" role="group" aria-label="Grid layout">
-          <button type="button" class="active" data-grid-layout="cards">Cards</button>
-          <button type="button" data-grid-layout="table">Table</button>
-        </div>
-      </section>
-
       <section class="results" aria-live="polite">
-        <div id="timelineView" class="timeline-view" hidden></div>
-        <div id="cardsView" class="cards-view" hidden></div>
-        <div id="tableView" class="table-wrap" hidden>
-          <table>
-            <thead>
-              <tr>
-                <th>Party</th>
-                <th>Area</th>
-                <th>2023-24</th>
-                <th>2024-25</th>
-                <th>2025-26</th>
-              </tr>
-            </thead>
-            <tbody id="tableBody"></tbody>
-          </table>
+        <div class="view-panels" id="viewPanels">
+          <div id="timelineView" class="view-panel timeline-view active" role="tabpanel" aria-labelledby="tabTimeline"></div>
+          <div id="cardsView" class="view-panel cards-view" role="tabpanel" aria-labelledby="tabCards" aria-hidden="true"></div>
+          <div id="tableView" class="view-panel table-wrap" role="tabpanel" aria-labelledby="tabTable" aria-hidden="true">
+            <table>
+              <thead>
+                <tr>
+                  <th>Party</th>
+                  <th>Area</th>
+                  <th>2023-24</th>
+                  <th>2024-25</th>
+                  <th>2025-26</th>
+                </tr>
+              </thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
         </div>
         <p id="emptyState" class="empty-state" hidden>No accounts match these filters.</p>
       </section>
     </main>
 
     <nav class="bottom-nav mobile-only" id="bottomNav" aria-label="Primary">
-      <button type="button" class="bottom-nav-item active" data-nav="timeline" aria-current="page">
-        <span class="nav-icon" aria-hidden="true">▦</span>
-        <span>Timeline</span>
-      </button>
-      <button type="button" class="bottom-nav-item" data-nav="grid">
-        <span class="nav-icon" aria-hidden="true">▣</span>
-        <span>Grid</span>
-      </button>
       <button type="button" class="bottom-nav-item" data-nav="filters" id="bottomFiltersBtn">
         <span class="nav-icon" aria-hidden="true">☰</span>
         <span>Filters</span>
@@ -188,11 +185,6 @@
           <input id="hideEmptyToggle" type="checkbox" />
           <span>Hide parties without selected-year amount</span>
         </label>
-        <div class="segmented three" role="group" aria-label="View mode">
-          <button type="button" data-filter-view="timeline">Timeline</button>
-          <button type="button" data-filter-view="cards">Cards</button>
-          <button type="button" data-filter-view="table">Table</button>
-        </div>
       </div>
 
       <div class="sheet-actions">
