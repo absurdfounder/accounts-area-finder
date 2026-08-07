@@ -14,42 +14,14 @@
     <main class="app-shell">
       <header class="app-header" id="appHeader">
         <div class="brand-row">
-          <div>
-            <p class="eyebrow">Super Sales Agro</p>
-            <h1>Mandi Desk</h1>
-          </div>
+          <h1>Mandi Desk</h1>
           <div class="header-actions desktop-only">
-            <button class="text-button" id="connectGoogleBtn" type="button">Connect Google</button>
-            <button class="text-button" id="importContactsBtn" type="button">Import</button>
-            <button class="text-button" id="openMatchBtn" type="button">Match</button>
-            <button class="icon-button" id="resetBtn" type="button" title="Reset filters" aria-label="Reset filters">
-              <span aria-hidden="true">↺</span>
-            </button>
+            <button class="text-button" id="openSearchBtnDesktop" type="button">Search</button>
+            <button class="text-button" id="openMoreBtnDesktop" type="button">More</button>
           </div>
-          <button class="icon-button mobile-only" id="moreBtn" type="button" aria-label="More actions" title="More">⋯</button>
         </div>
 
         <p class="session-line" id="sessionLine" hidden></p>
-
-        <label class="searchbar">
-          <span class="sr-only">Search accounts</span>
-          <input
-            id="searchInput"
-            type="search"
-            autocomplete="off"
-            enterkeyhint="search"
-            placeholder="Search party, code, area, phone"
-          />
-        </label>
-
-        <div class="quick-actions">
-          <div class="year-pills" id="yearPills" role="group" aria-label="Year filter"></div>
-          <button class="filter-button" id="openFiltersBtn" type="button">
-            Filters <span id="filterCount" hidden>0</span>
-          </button>
-        </div>
-
-        <div class="active-chips" id="activeChips" aria-label="Active filters"></div>
 
         <div class="view-tabs" role="tablist" aria-label="Main view">
           <button type="button" class="view-tab active" role="tab" data-view="timeline" id="tabTimeline" aria-selected="true">
@@ -73,21 +45,6 @@
           </div>
         </section>
       </header>
-
-      <section class="summary-strip" aria-label="Summary">
-        <div>
-          <span id="partyCount">0</span>
-          <small>Parties</small>
-        </div>
-        <div>
-          <span id="netTotal">0</span>
-          <small>Net amount</small>
-        </div>
-        <div>
-          <span id="caseTotal">0</span>
-          <small>Cases</small>
-        </div>
-      </section>
 
       <section class="results" aria-live="polite">
         <div class="view-panels" id="viewPanels">
@@ -113,15 +70,35 @@
     </main>
 
     <nav class="bottom-nav mobile-only" id="bottomNav" aria-label="Primary">
-      <button type="button" class="bottom-nav-item" data-nav="filters" id="bottomFiltersBtn">
-        <span class="nav-icon" aria-hidden="true">☰</span>
-        <span>Filters</span>
+      <button type="button" class="bottom-nav-item" data-nav="search" id="bottomSearchBtn">
+        <span class="nav-icon" aria-hidden="true">⌕</span>
+        <span>Search</span>
       </button>
       <button type="button" class="bottom-nav-item" data-nav="more" id="bottomMoreBtn">
         <span class="nav-icon" aria-hidden="true">⋯</span>
         <span>More</span>
       </button>
     </nav>
+
+    <div class="sheet-backdrop" id="searchBackdrop" hidden></div>
+    <aside class="filter-sheet search-sheet" id="searchSheet" aria-label="Search" aria-modal="true" role="dialog" hidden>
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <div class="sheet-head">
+        <h2>Search</h2>
+        <button class="icon-button flat" id="closeSearchBtn" type="button" aria-label="Close search">×</button>
+      </div>
+      <label class="searchbar sheet-search">
+        <span class="sr-only">Search accounts</span>
+        <input
+          id="searchInput"
+          type="search"
+          autocomplete="off"
+          enterkeyhint="search"
+          placeholder="Party, code, area, phone"
+        />
+      </label>
+      <p class="search-hint" id="searchHint">Search by party name, code, area, or phone number.</p>
+    </aside>
 
     <div class="sheet-backdrop" id="moreBackdrop" hidden></div>
     <aside class="filter-sheet more-sheet" id="moreSheet" aria-label="More actions" aria-modal="true" role="dialog" hidden>
@@ -130,12 +107,41 @@
         <h2>More</h2>
         <button class="icon-button flat" id="closeMoreBtn" type="button" aria-label="Close">×</button>
       </div>
-      <div class="more-actions">
-        <button type="button" class="primary-button" id="connectGoogleBtnMobile">Connect Google</button>
-        <button type="button" class="ghost-button" id="importContactsBtnMobile">Import contacts</button>
-        <button type="button" class="ghost-button" id="openMatchBtnMobile">Match contacts</button>
-        <button type="button" class="ghost-button" id="resetBtnMobile">Reset filters</button>
-        <button type="button" class="ghost-button" id="jumpTodayBtnMobile">Jump to today</button>
+
+      <div class="sheet-section">
+        <h3 class="sheet-section-title">Filters</h3>
+        <div class="sheet-controls compact">
+          <label>
+            <span>State</span>
+            <select id="stateFilter"></select>
+          </label>
+          <label>
+            <span>Region</span>
+            <select id="regionFilter"></select>
+          </label>
+          <label>
+            <span>Area group</span>
+            <select id="areaFilter"></select>
+          </label>
+        </div>
+        <button class="ghost-button compact" id="clearFiltersBtn" type="button">Clear filters</button>
+      </div>
+
+      <div class="sheet-section">
+        <h3 class="sheet-section-title">Contacts</h3>
+        <div class="more-actions">
+          <button type="button" class="primary-button" id="connectGoogleBtn">Connect Google</button>
+          <button type="button" class="ghost-button" id="importContactsBtn">Import contacts</button>
+          <button type="button" class="ghost-button" id="openMatchBtn">Match contacts</button>
+        </div>
+      </div>
+
+      <div class="sheet-section">
+        <h3 class="sheet-section-title">Actions</h3>
+        <div class="more-actions">
+          <button type="button" class="ghost-button" id="resetBtn">Reset all</button>
+          <button type="button" class="ghost-button" id="jumpTodayBtnMobile">Jump to today</button>
+        </div>
       </div>
     </aside>
 
@@ -150,48 +156,6 @@
     </aside>
 
     <input id="importFileInput" type="file" accept=".csv,.vcf,text/csv,text/vcard,text/x-vcard" hidden />
-
-    <div class="sheet-backdrop" id="filterBackdrop" hidden></div>
-    <aside class="filter-sheet" id="filterSheet" aria-label="Filters" aria-modal="true" role="dialog" hidden>
-      <div class="sheet-handle" aria-hidden="true"></div>
-      <div class="sheet-head">
-        <h2>Filters</h2>
-        <button class="icon-button flat" id="closeFiltersBtn" type="button" aria-label="Close filters">×</button>
-      </div>
-
-      <div class="sheet-controls">
-        <label>
-          <span>Year</span>
-          <select id="yearFilter">
-            <option value="all">All years</option>
-          </select>
-        </label>
-        <label>
-          <span>State</span>
-          <select id="stateFilter"></select>
-        </label>
-        <label>
-          <span>Region</span>
-          <select id="regionFilter"></select>
-        </label>
-        <label>
-          <span>Area group</span>
-          <select id="areaFilter"></select>
-        </label>
-      </div>
-
-      <div class="sheet-options">
-        <label class="toggle">
-          <input id="hideEmptyToggle" type="checkbox" />
-          <span>Hide parties without selected-year amount</span>
-        </label>
-      </div>
-
-      <div class="sheet-actions">
-        <button class="ghost-button" id="clearFiltersBtn" type="button">Clear</button>
-        <button class="primary-button" id="applyFiltersBtn" type="button">Apply</button>
-      </div>
-    </aside>
 
     <div class="sheet-backdrop" id="matchBackdrop" hidden></div>
     <aside class="filter-sheet match-sheet" id="matchSheet" aria-label="Match contacts" aria-modal="true" role="dialog" hidden>

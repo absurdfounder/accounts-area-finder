@@ -67,7 +67,7 @@ button {
   top: 0;
   z-index: 30;
   margin: 0 -12px;
-  padding: calc(10px + env(safe-area-inset-top)) 12px 10px;
+  padding: calc(6px + env(safe-area-inset-top)) 12px 6px;
   border-bottom: 1px solid rgba(217, 225, 236, 0.9);
   background: rgba(243, 246, 251, 0.98);
   backdrop-filter: blur(14px);
@@ -85,8 +85,8 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 10px;
+  gap: 8px;
+  margin-bottom: 6px;
 }
 
 .header-actions {
@@ -134,9 +134,9 @@ button {
 
 h1 {
   margin: 0;
-  font-size: 25px;
-  line-height: 1;
-  letter-spacing: 0;
+  font-size: 18px;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
 }
 
 .icon-button {
@@ -161,22 +161,66 @@ h1 {
   color: var(--ink);
 }
 
-.searchbar {
+.searchbar.sheet-search {
   display: block;
-  margin-bottom: 10px;
+  margin: 0;
 }
 
-.searchbar input {
+.searchbar.sheet-search input {
   width: 100%;
-  min-height: 48px;
+  min-height: 44px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--panel);
   color: var(--ink);
-  padding: 0 14px;
+  padding: 0 12px;
   outline: none;
   font-size: 16px;
-  box-shadow: 0 8px 22px rgba(23, 32, 51, 0.06);
+}
+
+.search-hint {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.sheet-section {
+  padding: 0 0 14px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 14px;
+}
+
+.sheet-section:last-child {
+  border-bottom: 0;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.sheet-section-title {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sheet-controls.compact label {
+  margin-bottom: 8px;
+}
+
+.sheet-controls.compact select {
+  min-height: 40px;
+  font-size: 14px;
+}
+
+.ghost-button.compact {
+  width: auto;
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 13px;
 }
 
 select,
@@ -1338,11 +1382,11 @@ body.sheet-open {
 .view-tabs {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
-  margin-top: 8px;
-  padding: 3px;
+  gap: 2px;
+  margin-top: 0;
+  padding: 2px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 10px;
   background: #e8eef5;
 }
 
@@ -1350,13 +1394,13 @@ body.sheet-open {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  min-height: 36px;
+  gap: 3px;
+  min-height: 32px;
   border: 0;
-  border-radius: 9px;
+  border-radius: 8px;
   background: transparent;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 900;
   cursor: pointer;
   transition: background 150ms ease, color 150ms ease, box-shadow 150ms ease;
@@ -1414,7 +1458,7 @@ body.sheet-open {
 }
 
 .timeline-nav {
-  margin: 8px 0 0;
+  margin: 4px 0 0;
   padding: 0;
   border: 0;
   background: transparent;
@@ -1432,11 +1476,12 @@ body.sheet-open {
 .jump-today-btn {
   flex: 0 0 auto;
   width: auto;
-  min-width: 64px;
-  min-height: 40px;
+  min-width: 52px;
+  min-height: 32px;
   margin: 0;
-  padding-inline: 12px;
+  padding-inline: 8px;
   justify-content: center;
+  font-size: 11px;
 }
 
 .more-actions {
@@ -1513,74 +1558,24 @@ body.sheet-open {
   .app-header {
     margin-inline: -10px;
     padding-inline: 10px;
-    padding-top: calc(8px + env(safe-area-inset-top));
-    padding-bottom: 8px;
+    padding-top: calc(4px + env(safe-area-inset-top));
+    padding-bottom: 4px;
   }
 
   .brand-row {
-    margin-bottom: 8px;
+    margin-bottom: 4px;
   }
 
   h1 {
-    font-size: 22px;
-  }
-
-  .eyebrow {
-    font-size: 10px;
-  }
-
-  .searchbar {
-    margin-bottom: 8px;
-  }
-
-  .searchbar input {
-    min-height: 44px;
-  }
-
-  .quick-actions {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .filter-button {
-    min-width: 84px;
-    min-height: 40px;
-    border-radius: 14px;
-    border-color: var(--blue);
-    background: var(--blue);
-    color: #fff;
-  }
-
-  .filter-button span {
-    background: #fff;
-    color: var(--blue);
-  }
-
-  .summary-strip {
-    margin: 10px 0;
-    gap: 6px;
-  }
-
-  .summary-strip > div {
-    padding: 8px;
-  }
-
-  .summary-strip span {
-    font-size: 15px;
-  }
-
-  .summary-strip small {
-    font-size: 10px;
+    font-size: 17px;
   }
 
   .timeline-nav {
-    margin-top: 6px;
+    margin-top: 4px;
   }
 
   .timeline-nav-row {
-    gap: 6px;
+    gap: 4px;
   }
 
   .month-rail {
@@ -1588,19 +1583,24 @@ body.sheet-open {
   }
 
   .month-pill {
-    min-width: 50px;
-    padding: 6px 7px;
+    min-width: 40px;
+    padding: 3px 5px;
   }
 
   .jump-today-btn {
-    min-height: 38px;
-    min-width: 58px;
-    padding-inline: 10px;
-    font-size: 12px;
+    min-height: 30px;
+    min-width: 48px;
+    padding-inline: 7px;
+    font-size: 10px;
   }
 
-  .summary-strip {
-    display: none;
+  .view-tab {
+    min-height: 30px;
+    font-size: 10px;
+  }
+
+  .view-tab .tab-icon {
+    font-size: 11px;
   }
 
   .toast {
@@ -1625,17 +1625,21 @@ body.sheet-open {
     display: flex;
   }
 
+  h1 {
+    font-size: 22px;
+  }
+
   .view-tab {
-    min-height: 40px;
-    font-size: 13px;
+    min-height: 36px;
+    font-size: 12px;
   }
 }
 
 .month-rail {
   display: flex;
-  gap: 8px;
+  gap: 4px;
   overflow-x: auto;
-  padding-bottom: 8px;
+  padding-bottom: 2px;
   scrollbar-width: none;
   scroll-snap-type: x proximity;
 }
@@ -1647,25 +1651,25 @@ body.sheet-open {
 .month-pill {
   flex: 0 0 auto;
   display: grid;
-  gap: 2px;
-  min-width: 58px;
+  gap: 1px;
+  min-width: 44px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 8px;
   background: var(--panel);
   color: var(--ink);
-  padding: 8px 10px;
+  padding: 4px 6px;
   cursor: pointer;
   scroll-snap-align: center;
 }
 
 .month-pill strong {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 950;
 }
 
 .month-pill span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
 }
 

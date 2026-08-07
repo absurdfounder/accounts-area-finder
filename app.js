@@ -30,24 +30,17 @@
 
   const els = {
     search: document.getElementById("searchInput"),
-    year: document.getElementById("yearFilter"),
     state: document.getElementById("stateFilter"),
     region: document.getElementById("regionFilter"),
     area: document.getElementById("areaFilter"),
     reset: document.getElementById("resetBtn"),
     clear: document.getElementById("clearFiltersBtn"),
-    apply: document.getElementById("applyFiltersBtn"),
-    openFilters: document.getElementById("openFiltersBtn"),
-    closeFilters: document.getElementById("closeFiltersBtn"),
-    filterSheet: document.getElementById("filterSheet"),
-    filterBackdrop: document.getElementById("filterBackdrop"),
-    filterCount: document.getElementById("filterCount"),
-    activeChips: document.getElementById("activeChips"),
-    yearPills: document.getElementById("yearPills"),
-    hideEmpty: document.getElementById("hideEmptyToggle"),
-    partyCount: document.getElementById("partyCount"),
-    netTotal: document.getElementById("netTotal"),
-    caseTotal: document.getElementById("caseTotal"),
+    searchBackdrop: document.getElementById("searchBackdrop"),
+    searchSheet: document.getElementById("searchSheet"),
+    closeSearch: document.getElementById("closeSearchBtn"),
+    openSearchDesktop: document.getElementById("openSearchBtnDesktop"),
+    openMoreDesktop: document.getElementById("openMoreBtnDesktop"),
+    searchHint: document.getElementById("searchHint"),
     cards: document.getElementById("cardsView"),
     table: document.getElementById("tableView"),
     tableBody: document.getElementById("tableBody"),
@@ -58,7 +51,6 @@
     timelineNav: document.getElementById("timelineNav"),
     monthRail: document.getElementById("monthRail"),
     jumpToday: document.getElementById("jumpTodayBtn"),
-    moreBtn: document.getElementById("moreBtn"),
     moreBackdrop: document.getElementById("moreBackdrop"),
     moreSheet: document.getElementById("moreSheet"),
     closeMore: document.getElementById("closeMoreBtn"),
@@ -237,24 +229,6 @@
   }
 
   function setupFilters() {
-    years.forEach((year) => {
-      const option = document.createElement("option");
-      option.value = year;
-      option.textContent = year;
-      els.year.appendChild(option);
-    });
-
-    const pillValues = [{ value: "all", label: "All" }, ...years.map((year) => ({ value: year, label: year.slice(2) }))];
-    els.yearPills.innerHTML = pillValues
-      .map((item) => `<button type="button" class="year-pill" data-year="${item.value}">${item.label}</button>`)
-      .join("");
-    els.yearPills.querySelectorAll("[data-year]").forEach((button) => {
-      button.addEventListener("click", () => {
-        els.year.value = button.dataset.year;
-        render();
-      });
-    });
-
     setOptions(els.state, unique(accounts, (a) => a.state), "All states");
     updateDependentFilters();
   }
@@ -278,13 +252,6 @@
     }
   }
 
-  function accountHasYearActivity(account, selectedYear) {
-    if (!selectedYear || selectedYear === "all") return true;
-    const yearData = account.years?.[selectedYear];
-    if (!yearData) return false;
-    return (yearData.netAmount !== null && yearData.netAmount !== undefined)
-      || (yearData.cases !== null && yearData.cases !== undefined);
-  }
 
   function matchesSearch(account, query) {
     if (!query) return true;
@@ -315,7 +282,6 @@
 
   function filteredAccounts() {
     const query = (els.search.value || "").trim();
-    const selectedYear = els.year.value || "all";
     const selectedState = els.state.value || "all";
     const selectedRegion = els.region.value || "all";
     const selectedArea = els.area.value || "all";
@@ -325,13 +291,7 @@
       .filter((account) => selectedState === "all" || account.state === selectedState)
       .filter((account) => selectedRegion === "all" || account.region === selectedRegion)
       .filter((account) => selectedArea === "all" || account.areaGroup === selectedArea)
-      .filter((account) => matchesSearch(account, query))
-      .filter((account) => accountHasYearActivity(account, selectedYear))
-      .filter((account) => {
-        if (!els.hideEmpty.checked || selectedYear === "all") return true;
-        const value = account.years[selectedYear]?.netAmount;
-        return value !== null && value !== undefined;
-      });
+      .filter((account) => matchesSearch(account, query));
 
     if (phone) {
       const byPhone = matcher.findByPhone(phone, store.getContacts(), accounts).accounts;
@@ -354,17 +314,8 @@
     ));
   }
 
-  function lotMatchesYearFilter(lot) {
-    const selected = els.year.value;
-    if (selected === "all") return true;
-    const source = String(lot.source || "");
-    if (source.includes(selected)) return true;
-    // Fiscal-year style evidence: Jul–Dec of start year, Jan–Mar of end year
-    const [startYear, endYear] = selected.split("-").map((part) => Number(part));
-    if (!startYear || !endYear) return true;
-    if (lot.year === startYear && lot.month >= 4) return true;
-    if (lot.year === endYear && lot.month <= 3) return true;
-    return false;
+  function lotMatchesYearFilter() {
+    return true;
   }
 
   function filteredLots() {
@@ -409,11 +360,9 @@
 
   function activeFilterItems() {
     const items = [];
-    if (els.year.value !== "all") items.push(els.year.value);
     if (els.state.value !== "all") items.push(els.state.value);
     if (els.region.value !== "all") items.push(els.region.value);
     if (els.area.value !== "all") items.push(els.area.value);
-    if (els.hideEmpty.checked) items.push("With selected year");
     return items;
   }
 
@@ -439,34 +388,17 @@
   }
 
   function renderControls() {
-    const activeItems = activeFilterItems();
-    els.filterCount.hidden = activeItems.length === 0;
-    els.filterCount.textContent = activeItems.length;
-    els.openFilters.classList.toggle("active", activeItems.length > 0);
-    els.activeChips.innerHTML = activeItems.map((item) => `<span class="active-chip">${escapeHtml(item)}</span>`).join("");
-    els.yearPills.querySelectorAll("[data-year]").forEach((button) => {
-      button.classList.toggle("active", button.dataset.year === els.year.value);
-    });
+    const query = (els.search.value || "").trim();
+    const filters = activeFilterItems();
+    const parts = [];
+    if (query) parts.push(`"${query}"`);
+    parts.push(...filters);
+    if (els.searchHint) {
+      els.searchHint.textContent = parts.length
+        ? `${parts.length} active: ${parts.join(" · ")}`
+        : "Search by party name, code, area, or phone number.";
+    }
     renderSessionLine();
-  }
-
-  function renderSummary(rows) {
-    const selectedYear = els.year.value;
-    const net = rows.reduce((sum, account) => sum + Number(valueFor(account, selectedYear, "netAmount") || 0), 0);
-    const cases = rows.reduce((sum, account) => sum + Number(valueFor(account, selectedYear, "cases") || 0), 0);
-    els.partyCount.textContent = nf.format(rows.length);
-    els.netTotal.textContent = formatAmount(net);
-    els.caseTotal.textContent = nf.format(cases);
-  }
-
-  function yearCell(account, year) {
-    return `
-      <div class="year-cell">
-        <span>${year.slice(2)}</span>
-        <strong>${formatAmount(account.years[year]?.netAmount)}</strong>
-        <small>${formatCases(account.years[year]?.cases)} cases</small>
-      </div>
-    `;
   }
 
   function contactBlock(account, { showCall = false } = {}) {
@@ -715,11 +647,10 @@
   }
 
   function renderCards(rows) {
-    const selectedYear = els.year.value;
     els.cards.innerHTML = rows
       .map((account) => {
-        const focusAmount = valueFor(account, selectedYear, "netAmount");
-        const focusCases = valueFor(account, selectedYear, "cases");
+        const focusAmount = valueFor(account, "all", "netAmount");
+        const focusCases = valueFor(account, "all", "cases");
         const negative = Number(focusAmount) < 0 ? "negative" : "";
         const pickAttr = pickModeContactId ? ` data-pick-party="${escapeHtml(account.partyCode)}"` : "";
         const yearSummary = years
@@ -941,10 +872,18 @@
     closeSheetPair(els.moreBackdrop, els.moreSheet);
   }
 
+  function openSearchSheet() {
+    openSheet(els.searchBackdrop, els.searchSheet);
+    requestAnimationFrame(() => els.search.focus());
+  }
+
+  function closeSearchSheet() {
+    closeSheetPair(els.searchBackdrop, els.searchSheet);
+  }
+
   function render() {
     renderControls();
     const rows = filteredAccounts();
-    renderSummary(rows);
 
     const panels = {
       timeline: els.timeline,
@@ -982,13 +921,11 @@
 
   function resetFilters() {
     els.search.value = "";
-    els.year.value = "all";
     els.state.value = "all";
     updateDependentFilters();
     els.region.value = "all";
     updateDependentFilters();
     els.area.value = "all";
-    els.hideEmpty.checked = false;
     pickModeContactId = null;
     document.body.classList.remove("pick-mode");
     render();
@@ -1012,14 +949,6 @@
       backdrop.hidden = true;
       sheet.hidden = true;
     }, 190);
-  }
-
-  function openFilterSheet() {
-    openSheet(els.filterBackdrop, els.filterSheet);
-  }
-
-  function closeFilterSheet() {
-    closeSheetPair(els.filterBackdrop, els.filterSheet);
   }
 
   function openMatchSheet() {
@@ -1085,7 +1014,6 @@
   }
 
   els.search.addEventListener("input", render);
-  els.year.addEventListener("change", render);
   els.state.addEventListener("change", () => {
     updateDependentFilters();
     render();
@@ -1095,26 +1023,35 @@
     render();
   });
   els.area.addEventListener("change", render);
-  els.hideEmpty.addEventListener("change", render);
-  els.reset.addEventListener("click", resetFilters);
-  els.clear.addEventListener("click", resetFilters);
-  els.openFilters.addEventListener("click", openFilterSheet);
-  els.closeFilters.addEventListener("click", () => {
-    render();
-    closeFilterSheet();
+  els.reset.addEventListener("click", () => {
+    closeMoreSheet();
+    resetFilters();
   });
-  els.filterBackdrop.addEventListener("click", () => {
+  els.clear.addEventListener("click", () => {
+    els.state.value = "all";
+    updateDependentFilters();
+    els.region.value = "all";
+    updateDependentFilters();
+    els.area.value = "all";
     render();
-    closeFilterSheet();
   });
-  els.apply.addEventListener("click", () => {
-    render();
-    closeFilterSheet();
+  els.closeSearch.addEventListener("click", closeSearchSheet);
+  els.searchBackdrop.addEventListener("click", closeSearchSheet);
+  els.openSearchDesktop?.addEventListener("click", openSearchSheet);
+  els.openMoreDesktop?.addEventListener("click", openMoreSheet);
+  els.connectGoogle.addEventListener("click", () => {
+    closeMoreSheet();
+    handleConnectGoogle();
   });
-  els.connectGoogle.addEventListener("click", handleConnectGoogle);
-  els.importContacts.addEventListener("click", () => els.importFile.click());
+  els.importContacts.addEventListener("click", () => {
+    closeMoreSheet();
+    els.importFile.click();
+  });
   els.importFile.addEventListener("change", handleImportFile);
-  els.openMatch.addEventListener("click", openMatchSheet);
+  els.openMatch.addEventListener("click", () => {
+    closeMoreSheet();
+    openMatchSheet();
+  });
   els.closeMatch.addEventListener("click", closeMatchSheet);
   els.matchBackdrop.addEventListener("click", closeMatchSheet);
   els.refreshContacts.addEventListener("click", handleRefreshContacts);
@@ -1124,10 +1061,10 @@
 
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
-    if (!els.moreSheet.hidden) closeMoreSheet();
+    if (!els.searchSheet.hidden) closeSearchSheet();
+    else if (!els.moreSheet.hidden) closeMoreSheet();
     else if (!els.partySheet.hidden) closePartySheet();
     else if (!els.matchSheet.hidden) closeMatchSheet();
-    else if (!els.filterSheet.hidden) closeFilterSheet();
     else if (pickModeContactId) {
       pickModeContactId = null;
       document.body.classList.remove("pick-mode");
@@ -1143,8 +1080,8 @@
   document.querySelectorAll("[data-nav]").forEach((button) => {
     button.addEventListener("click", () => {
       const nav = button.dataset.nav;
-      if (nav === "filters") {
-        openFilterSheet();
+      if (nav === "search") {
+        openSearchSheet();
       } else if (nav === "more") {
         openMoreSheet();
       }
@@ -1155,26 +1092,9 @@
     scrollTimelineToToday("smooth");
   });
 
-  els.moreBtn?.addEventListener("click", openMoreSheet);
   els.closeMore?.addEventListener("click", closeMoreSheet);
   els.moreBackdrop?.addEventListener("click", closeMoreSheet);
 
-  document.getElementById("connectGoogleBtnMobile")?.addEventListener("click", () => {
-    closeMoreSheet();
-    handleConnectGoogle();
-  });
-  document.getElementById("importContactsBtnMobile")?.addEventListener("click", () => {
-    closeMoreSheet();
-    els.importFile.click();
-  });
-  document.getElementById("openMatchBtnMobile")?.addEventListener("click", () => {
-    closeMoreSheet();
-    openMatchSheet();
-  });
-  document.getElementById("resetBtnMobile")?.addEventListener("click", () => {
-    closeMoreSheet();
-    resetFilters();
-  });
   document.getElementById("jumpTodayBtnMobile")?.addEventListener("click", () => {
     closeMoreSheet();
     switchView("timeline");
