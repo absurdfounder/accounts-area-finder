@@ -947,6 +947,7 @@
       document.body.classList.add("sheet-open");
       backdrop.classList.add("open");
       sheet.classList.add("open");
+      syncBottomNav();
     });
   }
 
@@ -954,6 +955,7 @@
     document.body.classList.remove("sheet-open");
     backdrop.classList.remove("open");
     sheet.classList.remove("open");
+    syncBottomNav();
     window.setTimeout(() => {
       backdrop.hidden = true;
       sheet.hidden = true;
