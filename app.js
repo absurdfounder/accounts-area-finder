@@ -421,10 +421,8 @@
   function contactHint(account) {
     if (!account) return "";
     const phone = getPartyPhone(account.partyCode);
-    if (phone) return `<span class="row-phone">+91 ${escapeHtml(phone)}</span>`;
-    const contact = store.contactForParty(account.partyCode);
-    if (contact?.name) return `<span class="row-contact">${escapeHtml(contact.name)}</span>`;
-    return `<span class="row-muted">Tap for details</span>`;
+    if (phone) return phone.slice(-4);
+    return "";
   }
 
   function shortYears(yearsList) {
@@ -596,21 +594,24 @@
     els.timeline.innerHTML = MONTH_NAMES.map((name, index) => {
       const month = index + 1;
       const weeks = [1, 2, 3, 4]
+        .filter((week) => {
+          const entries = seasonal[`${month}-${week}`] || [];
+          return entries.length > 0 || (month === today.month && week === today.week);
+        })
         .map((week) => {
           const entries = seasonal[`${month}-${week}`] || [];
           const isToday = month === today.month && week === today.week;
           return `
             <div class="timeline-week${isToday ? " is-today" : ""}" id="${isToday ? "timelineToday" : `week-${month}-${week}`}" data-month="${month}" data-week="${week}">
-              ${isToday ? `<div class="today-marker"><span>Today · ${today.day} ${name}</span></div>` : ""}
               <div class="timeline-week-head">
-                <strong>Week ${week}</strong>
-                <span>${WEEK_LABELS[week]} · ${entries.length} farmers</span>
+                ${isToday ? `<span class="today-tag">Today · ${today.day} ${name.slice(0, 3)}</span>` : `<strong>W${week}</strong>`}
+                <span>${entries.length}</span>
               </div>
               <div class="timeline-chip-row">
                 ${
                   entries.length
                     ? entries.map((entry) => partyChip(entry, { month, week })).join("")
-                    : `<span class="timeline-empty">No arrivals historically</span>`
+                    : `<span class="timeline-empty">No arrivals</span>`
                 }
               </div>
             </div>
@@ -618,11 +619,13 @@
         })
         .join("");
 
+      const monthCount = [1, 2, 3, 4].reduce((sum, week) => sum + ((seasonal[`${month}-${week}`] || []).length), 0);
+      if (!monthCount && month !== today.month) return "";
       return `
         <section class="timeline-month" id="month-${month}" data-month="${month}">
           <header class="timeline-month-head">
-            <h2>${name}</h2>
-            <span>Seasonal pattern across years</span>
+            <h2>${name.slice(0, 3)}</h2>
+            <span>${monthCount}</span>
           </header>
           ${weeks}
         </section>
@@ -653,27 +656,17 @@
         const focusCases = valueFor(account, "all", "cases");
         const negative = Number(focusAmount) < 0 ? "negative" : "";
         const pickAttr = pickModeContactId ? ` data-pick-party="${escapeHtml(account.partyCode)}"` : "";
-        const yearSummary = years
-          .map((year) => {
-            const amt = account.years[year]?.netAmount;
-            if (amt === null || amt === undefined) return "";
-            return `<span class="metric-pill${Number(amt) < 0 ? " negative" : ""}">${year.slice(2)} ${formatAmount(amt)}</span>`;
-          })
-          .filter(Boolean)
-          .join("");
+        const phoneTail = contactHint(account);
         return `
           <button type="button" class="account-row${pickAttr ? " pickable" : ""}" data-open-party="${escapeHtml(account.partyCode)}"${pickAttr}>
             <span class="row-left">
               <span class="party-code">${escapeHtml(account.partyCode)}</span>
               <span class="party-name">${escapeHtml(account.partyName)}</span>
-              <span class="row-sub">${escapeHtml(account.areaGroup)} · ${escapeHtml(account.region)}</span>
             </span>
             <span class="row-right">
               <strong class="amount-focus ${negative}">${formatAmount(focusAmount)}</strong>
-              <span class="row-metrics">${formatCases(focusCases)} cases</span>
-              ${contactHint(account)}
+              <span class="row-metrics">${formatCases(focusCases)} cs${phoneTail ? ` · ${phoneTail}` : ""}</span>
             </span>
-            ${yearSummary ? `<span class="row-years">${yearSummary}</span>` : ""}
           </button>
         `;
       })
@@ -864,21 +857,37 @@
     render();
   }
 
+  function syncBottomNav() {
+    const searchOpen = !els.searchSheet.hidden && els.searchSheet.classList.contains("open");
+    const moreOpen = !els.moreSheet.hidden && els.moreSheet.classList.contains("open");
+    document.querySelectorAll("[data-nav]").forEach((button) => {
+      const nav = button.dataset.nav;
+      const active = (nav === "search" && searchOpen) || (nav === "more" && moreOpen);
+      button.classList.toggle("active", active);
+    });
+  }
+
   function openMoreSheet() {
+    closeSearchSheet();
     openSheet(els.moreBackdrop, els.moreSheet);
+    syncBottomNav();
   }
 
   function closeMoreSheet() {
     closeSheetPair(els.moreBackdrop, els.moreSheet);
+    syncBottomNav();
   }
 
   function openSearchSheet() {
+    closeMoreSheet();
     openSheet(els.searchBackdrop, els.searchSheet);
+    syncBottomNav();
     requestAnimationFrame(() => els.search.focus());
   }
 
   function closeSearchSheet() {
     closeSheetPair(els.searchBackdrop, els.searchSheet);
+    syncBottomNav();
   }
 
   function render() {
