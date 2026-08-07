@@ -3,18 +3,22 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Accounts Area Finder</title>
+    <meta name="theme-color" content="#1f5f8b" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Mandi Desk" />
+    <title>Mandi Desk</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <main class="app-shell">
-      <header class="app-header">
+      <header class="app-header" id="appHeader">
         <div class="brand-row">
           <div>
             <p class="eyebrow">Super Sales Agro</p>
-            <h1>Accounts</h1>
+            <h1>Mandi Desk</h1>
           </div>
-          <div class="header-actions">
+          <div class="header-actions desktop-only">
             <button class="text-button" id="connectGoogleBtn" type="button">Connect Google</button>
             <button class="text-button" id="importContactsBtn" type="button">Import</button>
             <button class="text-button" id="openMatchBtn" type="button">Match</button>
@@ -22,6 +26,7 @@
               <span aria-hidden="true">↺</span>
             </button>
           </div>
+          <button class="icon-button mobile-only" id="moreBtn" type="button" aria-label="More actions" title="More">⋯</button>
         </div>
 
         <p class="session-line" id="sessionLine" hidden></p>
@@ -32,7 +37,8 @@
             id="searchInput"
             type="search"
             autocomplete="off"
-            placeholder="Search party, code, area, or phone"
+            enterkeyhint="search"
+            placeholder="Search party, code, area, phone"
           />
         </label>
 
@@ -44,6 +50,18 @@
         </div>
 
         <div class="active-chips" id="activeChips" aria-label="Active filters"></div>
+
+        <div class="view-tabs desktop-only" role="tablist" aria-label="Main view">
+          <button type="button" class="view-tab" role="tab" data-main-view="grid" id="tabGrid" aria-selected="false">Grid</button>
+          <button type="button" class="view-tab active" role="tab" data-main-view="timeline" id="tabTimeline" aria-selected="true">Timeline</button>
+        </div>
+
+        <section class="timeline-nav" id="timelineNav" hidden aria-label="Month navigator">
+          <div class="timeline-nav-row">
+            <div class="month-rail" id="monthRail" role="tablist" aria-label="Months"></div>
+            <button type="button" class="text-button primary-tint jump-today-btn" id="jumpTodayBtn">Today</button>
+          </div>
+        </section>
       </header>
 
       <section class="summary-strip" aria-label="Summary">
@@ -61,20 +79,10 @@
         </div>
       </section>
 
-      <section class="call-strip" id="callStrip" hidden aria-label="Who to call">
-        <div class="call-block">
-          <div class="call-block-head">
-            <h2>Call now</h2>
-            <span id="callNowLabel">This week</span>
-          </div>
-          <div class="call-chip-row" id="callNowList"></div>
-        </div>
-        <div class="call-block">
-          <div class="call-block-head">
-            <h2>Upcoming</h2>
-            <span>Next weeks</span>
-          </div>
-          <div class="call-chip-row" id="upcomingList"></div>
+      <section class="grid-toolbar" id="gridToolbar" hidden>
+        <div class="segmented" role="group" aria-label="Grid layout">
+          <button type="button" class="active" data-grid-layout="cards">Cards</button>
+          <button type="button" data-grid-layout="table">Table</button>
         </div>
       </section>
 
@@ -98,6 +106,41 @@
         <p id="emptyState" class="empty-state" hidden>No accounts match these filters.</p>
       </section>
     </main>
+
+    <nav class="bottom-nav mobile-only" id="bottomNav" aria-label="Primary">
+      <button type="button" class="bottom-nav-item active" data-nav="timeline" aria-current="page">
+        <span class="nav-icon" aria-hidden="true">▦</span>
+        <span>Timeline</span>
+      </button>
+      <button type="button" class="bottom-nav-item" data-nav="grid">
+        <span class="nav-icon" aria-hidden="true">▣</span>
+        <span>Grid</span>
+      </button>
+      <button type="button" class="bottom-nav-item" data-nav="filters" id="bottomFiltersBtn">
+        <span class="nav-icon" aria-hidden="true">☰</span>
+        <span>Filters</span>
+      </button>
+      <button type="button" class="bottom-nav-item" data-nav="more" id="bottomMoreBtn">
+        <span class="nav-icon" aria-hidden="true">⋯</span>
+        <span>More</span>
+      </button>
+    </nav>
+
+    <div class="sheet-backdrop" id="moreBackdrop" hidden></div>
+    <aside class="filter-sheet more-sheet" id="moreSheet" aria-label="More actions" aria-modal="true" role="dialog" hidden>
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <div class="sheet-head">
+        <h2>More</h2>
+        <button class="icon-button flat" id="closeMoreBtn" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="more-actions">
+        <button type="button" class="primary-button" id="connectGoogleBtnMobile">Connect Google</button>
+        <button type="button" class="ghost-button" id="importContactsBtnMobile">Import contacts</button>
+        <button type="button" class="ghost-button" id="openMatchBtnMobile">Match contacts</button>
+        <button type="button" class="ghost-button" id="resetBtnMobile">Reset filters</button>
+        <button type="button" class="ghost-button" id="jumpTodayBtnMobile">Jump to today</button>
+      </div>
+    </aside>
 
     <div class="sheet-backdrop" id="partyBackdrop" hidden></div>
     <aside class="filter-sheet party-sheet" id="partySheet" aria-label="Party detail" aria-modal="true" role="dialog" hidden>
@@ -145,10 +188,10 @@
           <input id="hideEmptyToggle" type="checkbox" />
           <span>Hide parties without selected-year amount</span>
         </label>
-        <div class="segmented three" role="group" aria-label="Display mode">
-          <button type="button" class="active" data-view="timeline">Timeline</button>
-          <button type="button" data-view="cards">Cards</button>
-          <button type="button" data-view="table">Table</button>
+        <div class="segmented three" role="group" aria-label="View mode">
+          <button type="button" data-filter-view="timeline">Timeline</button>
+          <button type="button" data-filter-view="cards">Cards</button>
+          <button type="button" data-filter-view="table">Table</button>
         </div>
       </div>
 

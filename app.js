@@ -52,12 +52,18 @@
     table: document.getElementById("tableView"),
     tableBody: document.getElementById("tableBody"),
     timeline: document.getElementById("timelineView"),
-    callStrip: document.getElementById("callStrip"),
-    callNowList: document.getElementById("callNowList"),
-    upcomingList: document.getElementById("upcomingList"),
-    callNowLabel: document.getElementById("callNowLabel"),
     empty: document.getElementById("emptyState"),
-    viewButtons: Array.from(document.querySelectorAll("[data-view]")),
+    mainTabs: Array.from(document.querySelectorAll("[data-main-view]")),
+    gridToolbar: document.getElementById("gridToolbar"),
+    gridLayoutButtons: Array.from(document.querySelectorAll("[data-grid-layout]")),
+    timelineNav: document.getElementById("timelineNav"),
+    monthRail: document.getElementById("monthRail"),
+    jumpToday: document.getElementById("jumpTodayBtn"),
+    moreBtn: document.getElementById("moreBtn"),
+    moreBackdrop: document.getElementById("moreBackdrop"),
+    moreSheet: document.getElementById("moreSheet"),
+    closeMore: document.getElementById("closeMoreBtn"),
+    bottomNav: document.getElementById("bottomNav"),
     connectGoogle: document.getElementById("connectGoogleBtn"),
     importContacts: document.getElementById("importContactsBtn"),
     openMatch: document.getElementById("openMatchBtn"),
@@ -85,31 +91,80 @@
     minimumFractionDigits: 0,
   });
 
-  let currentView = "timeline";
+  const PHONES_KEY = "ssa_party_phones_v1";
+  let mainView = "timeline";
+  let gridLayout = "cards";
   let toastTimer = null;
   let pickModeContactId = null;
-  let didScrollToToday = false;
+  let shouldFixtureToToday = true;
+
+  function readPhones() {
+    try {
+      return JSON.parse(localStorage.getItem(PHONES_KEY) || "{}") || {};
+    } catch {
+      return {};
+    }
+  }
+
+  function writePhones(map) {
+    localStorage.setItem(PHONES_KEY, JSON.stringify(map));
+  }
+
+  function getPartyPhone(partyCode) {
+    const manual = readPhones()[partyCode];
+    if (manual) return store.normalizePhone(manual);
+    const fromArea = store.phonesFromText(accountByCode[partyCode]?.rawArea || "");
+    if (fromArea[0]) return fromArea[0];
+    const contact = store.contactForParty(partyCode);
+    return contact?.phones?.[0] ? store.normalizePhone(contact.phones[0]) : "";
+  }
+
+  function setPartyPhone(partyCode, phone) {
+    const map = readPhones();
+    const normalized = store.normalizePhone(phone);
+    if (!normalized) {
+      delete map[partyCode];
+    } else {
+      map[partyCode] = normalized;
+    }
+    writePhones(map);
+    return normalized;
+  }
+
+  function ensureCallablePhone(partyCode) {
+    let phone = getPartyPhone(partyCode);
+    if (phone) return phone;
+    const entered = window.prompt("No number linked yet. Enter mobile number to call and save:");
+    if (!entered) return "";
+    phone = setPartyPhone(partyCode, entered);
+    if (!phone || phone.length < 10) {
+      showToast("Enter a valid 10-digit mobile number", true);
+      return "";
+    }
+    showToast("Number saved");
+    return phone;
+  }
+
+  function dialParty(partyCode, event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    const phone = ensureCallablePhone(partyCode);
+    if (!phone) return;
+    window.location.href = `tel:+91${phone}`;
+  }
+
+  function callButtonHtml(partyCode) {
+    const phone = getPartyPhone(partyCode);
+    const hint = phone ? "" : ' data-needs-number="1"';
+    return `<button type="button" class="chip-call call-action"${hint} data-call-party="${escapeHtml(partyCode)}">Call</button>`;
+  }
 
   function todayParts(date = new Date()) {
     const day = date.getDate();
     const week = day <= 7 ? 1 : day <= 14 ? 2 : day <= 21 ? 3 : 4;
     return { month: date.getMonth() + 1, week, day, year: date.getFullYear() };
-  }
-
-  function nextBuckets(month, week, count) {
-    const out = [];
-    let m = month;
-    let w = week;
-    for (let i = 0; i < count; i += 1) {
-      w += 1;
-      if (w > 4) {
-        w = 1;
-        m += 1;
-        if (m > 12) m = 1;
-      }
-      out.push({ month: m, week: w });
-    }
-    return out;
   }
 
   function valueFor(account, year, key) {
@@ -147,6 +202,7 @@
 
   function setOptions(select, values, label) {
     const current = select.value;
+    const keep = values.includes(current) ? current : "all";
     select.innerHTML = "";
     const all = document.createElement("option");
     all.value = "all";
@@ -158,7 +214,11 @@
       option.textContent = value;
       select.appendChild(option);
     });
-    select.value = values.includes(current) ? current : "all";
+    select.value = keep;
+    if (select.value !== keep) {
+      const match = Array.from(select.options).find((option) => option.value === keep);
+      if (match) match.selected = true;
+    }
   }
 
   function showToast(message, isError) {
@@ -202,16 +262,16 @@
   }
 
   function updateDependentFilters() {
-    const state = els.state.value;
-    const region = els.region.value;
-    const area = els.area.value;
+    const state = els.state.value || "all";
+    const region = els.region.value || "all";
+    const area = els.area.value || "all";
     const scopedByState = state === "all" ? accounts : accounts.filter((a) => a.state === state);
     const regions = unique(scopedByState, (a) => a.region);
     setOptions(els.region, regions, "All regions");
     if (region !== "all" && regions.includes(region)) {
       els.region.value = region;
     }
-    const nextRegion = els.region.value;
+    const nextRegion = els.region.value || "all";
     const scopedByRegion = nextRegion === "all" ? scopedByState : scopedByState.filter((a) => a.region === nextRegion);
     const areas = unique(scopedByRegion, (a) => a.areaGroup);
     setOptions(els.area, areas, "All area groups");
@@ -220,12 +280,22 @@
     }
   }
 
+  function accountHasYearActivity(account, selectedYear) {
+    if (!selectedYear || selectedYear === "all") return true;
+    const yearData = account.years?.[selectedYear];
+    if (!yearData) return false;
+    return (yearData.netAmount !== null && yearData.netAmount !== undefined)
+      || (yearData.cases !== null && yearData.cases !== undefined);
+  }
+
   function matchesSearch(account, query) {
     if (!query) return true;
     const phone = digitQuery(query);
     if (phone) {
       const hit = matcher.findByPhone(phone, store.getContacts(), [account]);
       if (hit.accounts.length) return true;
+      const manual = getPartyPhone(account.partyCode);
+      if (manual && (manual.includes(phone) || phone.includes(manual))) return true;
     }
     const linked = store.contactForParty(account.partyCode);
     const haystack = [
@@ -238,6 +308,7 @@
       linked?.name,
       linked?.org,
       ...(linked?.phones || []),
+      getPartyPhone(account.partyCode),
     ]
       .join(" ")
       .toLowerCase();
@@ -245,15 +316,19 @@
   }
 
   function filteredAccounts() {
-    const query = els.search.value.trim();
-    const selectedYear = els.year.value;
+    const query = (els.search.value || "").trim();
+    const selectedYear = els.year.value || "all";
+    const selectedState = els.state.value || "all";
+    const selectedRegion = els.region.value || "all";
+    const selectedArea = els.area.value || "all";
     const phone = digitQuery(query);
 
     let rows = accounts
-      .filter((account) => els.state.value === "all" || account.state === els.state.value)
-      .filter((account) => els.region.value === "all" || account.region === els.region.value)
-      .filter((account) => els.area.value === "all" || account.areaGroup === els.area.value)
+      .filter((account) => selectedState === "all" || account.state === selectedState)
+      .filter((account) => selectedRegion === "all" || account.region === selectedRegion)
+      .filter((account) => selectedArea === "all" || account.areaGroup === selectedArea)
       .filter((account) => matchesSearch(account, query))
+      .filter((account) => accountHasYearActivity(account, selectedYear))
       .filter((account) => {
         if (!els.hideEmpty.checked || selectedYear === "all") return true;
         const value = account.years[selectedYear]?.netAmount;
@@ -263,6 +338,10 @@
     if (phone) {
       const byPhone = matcher.findByPhone(phone, store.getContacts(), accounts).accounts;
       const codes = new Set(byPhone.map((a) => a.partyCode));
+      accounts.forEach((account) => {
+        const manual = getPartyPhone(account.partyCode);
+        if (manual && (manual.includes(phone) || phone.includes(manual))) codes.add(account.partyCode);
+      });
       if (codes.size) {
         rows = rows.filter((account) => codes.has(account.partyCode));
       }
@@ -393,15 +472,17 @@
   }
 
   function contactBlock(account) {
+    if (!account) return "";
     const contact = store.contactForParty(account.partyCode);
-    if (!contact) return "";
-    const phone = contact.phones?.[0];
-    const tel = phone ? `<a class="tel-link" href="tel:+91${escapeHtml(phone)}">${escapeHtml(phone)}</a>` : "";
+    const phone = getPartyPhone(account.partyCode);
+    const contactName = contact?.name ? `<strong>${escapeHtml(contact.name)}</strong>` : "";
+    const phoneLabel = phone ? `<span class="tel-link">+91 ${escapeHtml(phone)}</span>` : `<span class="muted-note">No number yet</span>`;
     return `
       <div class="contact-link-row">
-        <span class="contact-badge">Contact</span>
-        <strong>${escapeHtml(contact.name)}</strong>
-        ${tel}
+        <span class="contact-badge">${contact ? "Contact" : "Phone"}</span>
+        ${contactName}
+        ${phoneLabel}
+        ${callButtonHtml(account.partyCode)}
       </div>
     `;
   }
@@ -413,37 +494,46 @@
   function partyChip(entry, opts = {}) {
     const account = accountByCode[entry.partyCode];
     const name = account?.partyName || entry.partyCode;
-    const contact = store.contactForParty(entry.partyCode);
-    const phone = contact?.phones?.[0];
-    const call = phone
-      ? `<a class="chip-call" href="tel:+91${escapeHtml(phone)}" onclick="event.stopPropagation()">Call</a>`
-      : "";
     const meta = opts.hideMeta
       ? ""
       : `<span class="chip-meta">×${entry.lotCount}${entry.years?.length ? ` · ${escapeHtml(shortYears(entry.years))}` : ""}</span>`;
     return `
-      <button type="button" class="party-chip" data-party-code="${escapeHtml(entry.partyCode)}" data-month="${opts.month || ""}" data-week="${opts.week || ""}">
-        <span class="chip-code">${escapeHtml(entry.partyCode)}</span>
-        <span class="chip-name">${escapeHtml(name)}</span>
-        ${meta}
-        ${call}
-      </button>
+      <div class="party-chip" data-party-code="${escapeHtml(entry.partyCode)}" data-month="${opts.month || ""}" data-week="${opts.week || ""}">
+        <button type="button" class="chip-main" data-open-party="${escapeHtml(entry.partyCode)}">
+          <span class="chip-code">${escapeHtml(entry.partyCode)}</span>
+          <span class="chip-name">${escapeHtml(name)}</span>
+          ${meta}
+        </button>
+        ${callButtonHtml(entry.partyCode)}
+      </div>
     `;
   }
 
+  function bindCallActions(root) {
+    root.querySelectorAll("[data-call-party]").forEach((button) => {
+      button.addEventListener("click", (event) => dialParty(button.dataset.callParty, event));
+    });
+  }
+
   function bindPartyChips(root) {
-    root.querySelectorAll(".party-chip").forEach((chip) => {
-      chip.addEventListener("click", () => {
-        openPartySheet(chip.dataset.partyCode, Number(chip.dataset.month) || null, Number(chip.dataset.week) || null);
+    root.querySelectorAll("[data-open-party]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const chip = button.closest(".party-chip");
+        openPartySheet(
+          button.dataset.openParty,
+          Number(chip?.dataset.month) || null,
+          Number(chip?.dataset.week) || null
+        );
       });
     });
+    bindCallActions(root);
   }
 
   function openPartySheet(partyCode, month, week) {
     const account = accountByCode[partyCode];
     const lots = filteredLots().filter((lot) => lot.partyCode === partyCode);
     const scoped = month && week ? lots.filter((lot) => lot.month === month && lot.week === week) : lots;
-    const contact = store.contactForParty(partyCode);
+    const phone = getPartyPhone(partyCode);
     els.partySheetTitle.textContent = account?.partyName || partyCode;
 
     const byMonth = {};
@@ -458,6 +548,16 @@
         ${account ? `· ${escapeHtml(account.areaGroup)} · ${escapeHtml(account.region)}` : ""}
       </p>
       ${contactBlock(account || { partyCode })}
+      <div class="party-phone-edit">
+        <label>
+          <span>Mobile number</span>
+          <input id="partyPhoneInput" type="tel" inputmode="numeric" placeholder="10-digit mobile" value="${escapeHtml(phone)}" />
+        </label>
+        <div class="party-phone-actions">
+          <button type="button" class="ghost-button compact" id="savePartyPhoneBtn">Save number</button>
+          <button type="button" class="primary-button compact" id="callPartySheetBtn" data-call-party="${escapeHtml(partyCode)}">Call</button>
+        </div>
+      </div>
       ${
         month && week
           ? `<p class="party-sheet-focus">In ${escapeHtml(MONTH_NAMES[month - 1])} week ${week}: <strong>${scoped.length}</strong> historical arrival${scoped.length === 1 ? "" : "s"}</p>`
@@ -481,59 +581,89 @@
       </div>
     `;
     openSheet(els.partyBackdrop, els.partySheet);
+    document.getElementById("savePartyPhoneBtn")?.addEventListener("click", () => {
+      const value = document.getElementById("partyPhoneInput")?.value || "";
+      const saved = setPartyPhone(partyCode, value);
+      if (value && (!saved || saved.length < 10)) {
+        showToast("Enter a valid 10-digit mobile number", true);
+        return;
+      }
+      showToast(saved ? "Number saved" : "Number cleared");
+      openPartySheet(partyCode, month, week);
+      render();
+    });
+    bindCallActions(els.partySheetBody);
   }
 
   function closePartySheet() {
     closeSheetPair(els.partyBackdrop, els.partySheet);
   }
 
-  function renderCallStrip(seasonal) {
+  function updateStickyOffsets() {
+    const header = document.getElementById("appHeader") || document.querySelector(".app-header");
+    const headerHeight = header ? Math.ceil(header.getBoundingClientRect().height) : 0;
+    const monthHead = els.timeline.querySelector(".timeline-month-head");
+    const monthHeadHeight = monthHead ? Math.ceil(monthHead.getBoundingClientRect().height) : 48;
+    const root = document.documentElement;
+    root.style.setProperty("--sticky-header-height", `${headerHeight}px`);
+    root.style.setProperty("--sticky-month-top", `${headerHeight}px`);
+    root.style.setProperty("--sticky-week-top", `${headerHeight + monthHeadHeight}px`);
+  }
+
+  function scrollTimelineToToday(behavior = "auto") {
+    updateStickyOffsets();
+    const marker = document.getElementById("timelineToday");
+    if (!marker) return;
+    marker.scrollIntoView({ block: "start", behavior });
+    const month = todayParts().month;
+    const pill = els.monthRail.querySelector(`[data-month="${month}"]`);
+    if (pill) pill.scrollIntoView({ inline: "center", block: "nearest", behavior });
+  }
+
+  function renderMonthRail(seasonal, activeMonth) {
     const today = todayParts();
-    const nowKey = `${today.month}-${today.week}`;
-    const nowEntries = seasonal[nowKey] || [];
-    const upcoming = nextBuckets(today.month, today.week, 2).flatMap(({ month, week }) =>
-      (seasonal[`${month}-${week}`] || []).map((entry) => ({ ...entry, month, week }))
-    );
+    els.monthRail.innerHTML = MONTH_NAMES.map((name, index) => {
+      const month = index + 1;
+      const count = [1, 2, 3, 4].reduce((sum, week) => sum + ((seasonal[`${month}-${week}`] || []).length), 0);
+      const isActive = month === activeMonth;
+      const isTodayMonth = month === today.month;
+      return `
+        <button type="button" class="month-pill${isActive ? " active" : ""}${isTodayMonth ? " is-current" : ""}" data-month="${month}" role="tab" aria-selected="${isActive}">
+          <strong>${name.slice(0, 3)}</strong>
+          <span>${count}</span>
+        </button>
+      `;
+    }).join("");
 
-    // Dedupe upcoming against call-now
-    const nowCodes = new Set(nowEntries.map((entry) => entry.partyCode));
-    const upcomingUnique = [];
-    const seen = new Set();
-    upcoming.forEach((entry) => {
-      if (nowCodes.has(entry.partyCode) || seen.has(entry.partyCode)) return;
-      seen.add(entry.partyCode);
-      upcomingUnique.push(entry);
+    els.monthRail.querySelectorAll("[data-month]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const target = document.getElementById(`month-${button.dataset.month}`);
+        if (target) target.scrollIntoView({ block: "start", behavior: "smooth" });
+        els.monthRail.querySelectorAll(".month-pill").forEach((pill) => {
+          const on = pill === button;
+          pill.classList.toggle("active", on);
+          pill.setAttribute("aria-selected", on ? "true" : "false");
+        });
+        button.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+      });
     });
-
-    els.callNowLabel.textContent = `${MONTH_NAMES[today.month - 1]} · Week ${today.week}`;
-    els.callNowList.innerHTML = nowEntries.length
-      ? nowEntries.slice(0, 24).map((entry) => partyChip(entry, { month: today.month, week: today.week })).join("")
-      : `<p class="call-empty">No recurring farmers for this week in the current filters.</p>`;
-    els.upcomingList.innerHTML = upcomingUnique.length
-      ? upcomingUnique
-          .slice(0, 24)
-          .map((entry) => partyChip(entry, { month: entry.month, week: entry.week }))
-          .join("")
-      : `<p class="call-empty">No upcoming farmers in the next two weeks.</p>`;
-
-    bindPartyChips(els.callNowList);
-    bindPartyChips(els.upcomingList);
   }
 
   function renderTimeline() {
     const lots = filteredLots();
     const seasonal = buildSeasonalFromLots(lots);
     const today = todayParts();
-    renderCallStrip(seasonal);
+    const restoreY = window.scrollY;
+    renderMonthRail(seasonal, today.month);
 
-    const monthsHtml = MONTH_NAMES.map((name, index) => {
+    els.timeline.innerHTML = MONTH_NAMES.map((name, index) => {
       const month = index + 1;
       const weeks = [1, 2, 3, 4]
         .map((week) => {
           const entries = seasonal[`${month}-${week}`] || [];
           const isToday = month === today.month && week === today.week;
           return `
-            <div class="timeline-week${isToday ? " is-today" : ""}" id="${isToday ? "timelineToday" : ""}" data-month="${month}" data-week="${week}">
+            <div class="timeline-week${isToday ? " is-today" : ""}" id="${isToday ? "timelineToday" : `week-${month}-${week}`}" data-month="${month}" data-week="${week}">
               ${isToday ? `<div class="today-marker"><span>Today · ${today.day} ${name}</span></div>` : ""}
               <div class="timeline-week-head">
                 <strong>Week ${week}</strong>
@@ -552,7 +682,7 @@
         .join("");
 
       return `
-        <section class="timeline-month" data-month="${month}">
+        <section class="timeline-month" id="month-${month}" data-month="${month}">
           <header class="timeline-month-head">
             <h2>${name}</h2>
             <span>Seasonal pattern across years</span>
@@ -562,14 +692,19 @@
       `;
     }).join("");
 
-    els.timeline.innerHTML = monthsHtml;
     bindPartyChips(els.timeline);
+    updateStickyOffsets();
 
-    if (!didScrollToToday) {
+    if (shouldFixtureToToday) {
+      shouldFixtureToToday = false;
       requestAnimationFrame(() => {
-        const marker = document.getElementById("timelineToday");
-        if (marker) marker.scrollIntoView({ block: "center", behavior: "smooth" });
-        didScrollToToday = true;
+        updateStickyOffsets();
+        requestAnimationFrame(() => scrollTimelineToToday("auto"));
+      });
+    } else {
+      requestAnimationFrame(() => {
+        updateStickyOffsets();
+        window.scrollTo(0, restoreY);
       });
     }
   }
@@ -608,6 +743,8 @@
       })
       .join("");
 
+    bindCallActions(els.cards);
+
     if (pickModeContactId) {
       els.cards.querySelectorAll("[data-pick-party]").forEach((card) => {
         card.classList.add("pickable");
@@ -634,9 +771,11 @@
           })
           .join("");
         const contact = store.contactForParty(account.partyCode);
-        const contactHtml = contact
-          ? `<br /><small class="contact-inline">${escapeHtml(contact.name)}${contact.phones?.[0] ? ` · ${escapeHtml(contact.phones[0])}` : ""}</small>`
-          : "";
+        const phone = getPartyPhone(account.partyCode);
+        const contactHtml = `
+          <br /><small class="contact-inline">${contact ? escapeHtml(contact.name) : "Party"}${phone ? ` · ${escapeHtml(phone)}` : " · no number"}</small>
+          <br />${callButtonHtml(account.partyCode)}
+        `;
         return `
           <tr>
             <td><strong>${escapeHtml(account.partyCode)}</strong><br />${escapeHtml(account.partyName)}${contactHtml}</td>
@@ -646,6 +785,7 @@
         `;
       })
       .join("");
+    bindCallActions(els.tableBody);
   }
 
   function renderMatchSheet() {
@@ -737,8 +877,9 @@
         pickModeContactId = button.dataset.contactId;
         document.body.classList.add("pick-mode");
         closeMatchSheet();
-        currentView = "cards";
-        els.viewButtons.forEach((item) => item.classList.toggle("active", item.dataset.view === "cards"));
+        mainView = "grid";
+        gridLayout = "cards";
+        syncViewChrome();
         showToast("Tap a party card to link this contact");
         render();
       });
@@ -753,17 +894,57 @@
     });
   }
 
+  function syncViewChrome() {
+    els.mainTabs.forEach((tab) => {
+      const active = tab.dataset.mainView === mainView;
+      tab.classList.toggle("active", active);
+      tab.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    els.gridLayoutButtons.forEach((button) => {
+      button.classList.toggle("active", button.dataset.gridLayout === gridLayout);
+    });
+    document.querySelectorAll("[data-filter-view]").forEach((button) => {
+      const mode = button.dataset.filterView;
+      const active =
+        (mode === "timeline" && mainView === "timeline") ||
+        (mode === "cards" && mainView === "grid" && gridLayout === "cards") ||
+        (mode === "table" && mainView === "grid" && gridLayout === "table");
+      button.classList.toggle("active", active);
+    });
+    document.querySelectorAll("[data-nav]").forEach((button) => {
+      const nav = button.dataset.nav;
+      const active =
+        (nav === "timeline" && mainView === "timeline") ||
+        (nav === "grid" && mainView === "grid");
+      button.classList.toggle("active", active);
+      if (nav === "timeline" || nav === "grid") {
+        button.setAttribute("aria-current", active ? "page" : "false");
+      }
+    });
+    requestAnimationFrame(updateStickyOffsets);
+  }
+
+  function openMoreSheet() {
+    openSheet(els.moreBackdrop, els.moreSheet);
+  }
+
+  function closeMoreSheet() {
+    closeSheetPair(els.moreBackdrop, els.moreSheet);
+  }
+
   function render() {
-    updateDependentFilters();
     renderControls();
+    syncViewChrome();
     const rows = filteredAccounts();
     renderSummary(rows);
 
-    const showTimeline = currentView === "timeline";
-    const showCards = currentView === "cards";
-    const showTable = currentView === "table";
+    const showTimeline = mainView === "timeline";
+    const showGrid = mainView === "grid";
+    const showCards = showGrid && gridLayout === "cards";
+    const showTable = showGrid && gridLayout === "table";
 
-    els.callStrip.hidden = !showTimeline;
+    els.gridToolbar.hidden = !showGrid;
+    els.timelineNav.hidden = !showTimeline;
     els.timeline.hidden = !showTimeline;
     els.cards.hidden = !showCards || rows.length === 0;
     els.table.hidden = !showTable || rows.length === 0;
@@ -892,16 +1073,31 @@
 
   els.search.addEventListener("input", render);
   els.year.addEventListener("change", render);
-  els.state.addEventListener("change", render);
-  els.region.addEventListener("change", render);
+  els.state.addEventListener("change", () => {
+    updateDependentFilters();
+    render();
+  });
+  els.region.addEventListener("change", () => {
+    updateDependentFilters();
+    render();
+  });
   els.area.addEventListener("change", render);
   els.hideEmpty.addEventListener("change", render);
   els.reset.addEventListener("click", resetFilters);
   els.clear.addEventListener("click", resetFilters);
   els.openFilters.addEventListener("click", openFilterSheet);
-  els.closeFilters.addEventListener("click", closeFilterSheet);
-  els.filterBackdrop.addEventListener("click", closeFilterSheet);
-  els.apply.addEventListener("click", closeFilterSheet);
+  els.closeFilters.addEventListener("click", () => {
+    render();
+    closeFilterSheet();
+  });
+  els.filterBackdrop.addEventListener("click", () => {
+    render();
+    closeFilterSheet();
+  });
+  els.apply.addEventListener("click", () => {
+    render();
+    closeFilterSheet();
+  });
   els.connectGoogle.addEventListener("click", handleConnectGoogle);
   els.importContacts.addEventListener("click", () => els.importFile.click());
   els.importFile.addEventListener("change", handleImportFile);
@@ -915,7 +1111,8 @@
 
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
-    if (!els.partySheet.hidden) closePartySheet();
+    if (!els.moreSheet.hidden) closeMoreSheet();
+    else if (!els.partySheet.hidden) closePartySheet();
     else if (!els.matchSheet.hidden) closeMatchSheet();
     else if (!els.filterSheet.hidden) closeFilterSheet();
     else if (pickModeContactId) {
@@ -926,13 +1123,88 @@
     }
   });
 
-  els.viewButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      currentView = button.dataset.view;
-      els.viewButtons.forEach((item) => item.classList.toggle("active", item === button));
-      if (currentView === "timeline") didScrollToToday = false;
+  els.mainTabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      mainView = tab.dataset.mainView;
+      if (mainView === "timeline") shouldFixtureToToday = true;
       render();
     });
+  });
+
+  els.gridLayoutButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      gridLayout = button.dataset.gridLayout;
+      mainView = "grid";
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-filter-view]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const mode = button.dataset.filterView;
+      if (mode === "timeline") {
+        mainView = "timeline";
+        shouldFixtureToToday = true;
+      } else {
+        mainView = "grid";
+        gridLayout = mode;
+      }
+      render();
+      closeFilterSheet();
+    });
+  });
+
+  document.querySelectorAll("[data-nav]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const nav = button.dataset.nav;
+      if (nav === "timeline") {
+        mainView = "timeline";
+        shouldFixtureToToday = true;
+        render();
+      } else if (nav === "grid") {
+        mainView = "grid";
+        render();
+      } else if (nav === "filters") {
+        openFilterSheet();
+      } else if (nav === "more") {
+        openMoreSheet();
+      }
+    });
+  });
+
+  els.jumpToday.addEventListener("click", () => {
+    scrollTimelineToToday("smooth");
+  });
+
+  els.moreBtn?.addEventListener("click", openMoreSheet);
+  els.closeMore?.addEventListener("click", closeMoreSheet);
+  els.moreBackdrop?.addEventListener("click", closeMoreSheet);
+
+  document.getElementById("connectGoogleBtnMobile")?.addEventListener("click", () => {
+    closeMoreSheet();
+    handleConnectGoogle();
+  });
+  document.getElementById("importContactsBtnMobile")?.addEventListener("click", () => {
+    closeMoreSheet();
+    els.importFile.click();
+  });
+  document.getElementById("openMatchBtnMobile")?.addEventListener("click", () => {
+    closeMoreSheet();
+    openMatchSheet();
+  });
+  document.getElementById("resetBtnMobile")?.addEventListener("click", () => {
+    closeMoreSheet();
+    resetFilters();
+  });
+  document.getElementById("jumpTodayBtnMobile")?.addEventListener("click", () => {
+    closeMoreSheet();
+    mainView = "timeline";
+    shouldFixtureToToday = true;
+    render();
+  });
+
+  window.addEventListener("resize", () => {
+    updateStickyOffsets();
   });
 
   setupFilters();

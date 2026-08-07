@@ -6,7 +6,7 @@ Live site: https://vocal-tulumba-d77c15.netlify.app
 
 ## Features
 
-- **Timeline view** — year-agnostic month/week produce arrivals (who to call this week + upcoming)
+- **Timeline view** — year-agnostic month/week produce arrivals (opens on the current month; scroll up/down freely)
 - Filter parties by year, state, region, area
 - Connect Google Contacts (People API) or import CSV/vCard
 - Suggested contact ↔ party matches; confirm links locally
